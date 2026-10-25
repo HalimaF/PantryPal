@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>What Can I Cook? — Scope</title>
+<style>
+  :root { --bg:#fffaf3; --ink:#2b2118; --muted:#7a6a5a; --card:#fff; --line:#eadfce; --accent:#d9622b; --green:#3f7d4e; --red:#a8402f; }
+  @media (prefers-color-scheme: dark) { :root { --bg:#1d1813; --ink:#f3e9dc; --muted:#b5a592; --card:#292119; --line:#3d3226; --accent:#f08a57; --green:#7fc08f; --red:#e88a78; } }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--ink); font:16px/1.55 system-ui,sans-serif; }
+  main { max-width:760px; margin:0 auto; padding:24px 16px 56px; }
+  h1 { margin:0 0 4px; font-size:2rem; }
+  h2 { margin:32px 0 10px; font-size:1.15rem; color:var(--accent); }
+  .sub { color:var(--muted); margin:0 0 8px; }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:12px; padding:14px 16px; }
+  .kernel { border-color:var(--accent); background:color-mix(in srgb, var(--accent) 8%, var(--card)); font-size:1.05rem; }
+  .flow { display:flex; flex-wrap:wrap; align-items:stretch; gap:8px; }
+  .node { flex:1 1 130px; background:var(--card); border:1px solid var(--line); border-radius:10px; padding:10px; font-size:.9rem; text-align:center; }
+  .node b { display:block; color:var(--accent); font-size:.75rem; letter-spacing:.05em; text-transform:uppercase; }
+  .arrow { align-self:center; color:var(--muted); }
+  .branch { margin-top:10px; font-size:.9rem; color:var(--muted); }
+  details { background:var(--card); border:1px solid var(--line); border-radius:10px; padding:10px 14px; margin-bottom:8px; }
+  summary { cursor:pointer; font-weight:600; }
+  summary.now { color:var(--green); } summary.later { color:var(--accent); } summary.cut { color:var(--red); }
+  ul { margin:8px 0 0; padding-left:20px; }
+  .steps button { font:inherit; border:1px solid var(--line); background:var(--card); color:var(--ink); border-radius:8px; padding:6px 12px; cursor:pointer; margin-right:6px; }
+  .steps button:focus-visible { outline:2px solid var(--accent); outline-offset:2px; }
+  #stepbox { margin-top:10px; min-height:64px; }
+  .note { font-size:.9rem; color:var(--muted); }
+</style>
+</head>
+<body>
+<main>
+  <h1>What Can I Cook?</h1>
+  <p class="sub">A website that tells a homemaker what to cook today from what is actually at home, without repeating recent meals.</p>
+  <p class="note">Status: <b>approved</b> · Markdown version (<code>scope.md</code>) is the canonical copy.</p>
+
+  <h2>The Unique Kernel</h2>
+  <div class="card kernel">“What should I cook today, from what's in the house, without repeating what we just ate.”<br>
+  <span class="note">Remembering recent meals is what separates this from a plain recipe search.</span></div>
+
+  <h2>Who It's For</h2>
+  <div class="card">Homemakers, especially mothers in middle-class Asian households: a daily “what to make today?” and a tight budget that must last the whole month. First real users: the learner's own family. <span class="note">Later: students in rented apartments abroad.</span></div>
+
+  <h2>The Core Loop</h2>
+  <div class="flow" role="img" aria-label="Flow: sign in, then either enter groceries or ask for a food suggestion, which returns dishes and recipes and records what was eaten">
+    <div class="node"><b>1</b>Sign up / log in</div><span class="arrow">→</span>
+    <div class="node"><b>2</b>Enter monthly groceries<br>(photo or text)</div><span class="arrow">→</span>
+    <div class="node"><b>3</b>Food suggestion<br>+ today's preference</div><span class="arrow">→</span>
+    <div class="node"><b>4</b>Dishes + recipes</div><span class="arrow">→</span>
+    <div class="node"><b>5</b>Remember what was eaten</div>
+  </div>
+  <p class="branch">No groceries entered? Step 3 asks for her preference and the items she has, then suggests dishes and recipes. Step 5 feeds back into step 3, so dishes don't repeat too often.</p>
+
+  <h2>What “Working” Looks Like</h2>
+  <div class="steps card">
+    <p style="margin-top:0">Step through the family demo:</p>
+    <button id="prev" type="button">← Back</button><button id="next" type="button">Next →</button>
+    <div id="stepbox" aria-live="polite"></div>
+  </div>
+
+  <h2>The Boundary</h2>
+  <details open><summary class="now">Now (in the proof of concept)</summary><ul>
+    <li>Sign up / log in</li>
+    <li>Grocery entry by photo, with a text option</li>
+    <li>Food suggestion with a daily preference (rice, bread, roti…)</li>
+    <li>Fallback when no groceries entered: ask preferences and items</li>
+    <li>Recipes for suggested dishes</li>
+    <li>Remember eaten dishes to avoid repeats</li>
+    <li>Website that works well on a phone</li>
+  </ul><p class="note">Your decision: login and photo entry both stay in. “Somewhat accurate” is fine for a first MVP.</p></details>
+  <details><summary class="later">Later</summary><ul>
+    <li>Update stock from a photo of the cooked meal</li>
+    <li>Flutter mobile app (you already have a Google Play account)</li>
+    <li>Students living abroad as a distinct audience</li>
+    <li>Commercial viability</li>
+  </ul></details>
+  <details><summary class="cut">Explicitly cut</summary><ul>
+    <li><b>Exact quantity tracking</b> over the month — “somewhat accurate” accepted for MVP.</li>
+    <li><b>Mobile app for this hackathon</b> — website first so the family can test.</li>
+  </ul></details>
+
+  <h2>Why It Matters</h2>
+  <div class="card">You've seen this daily confusion and tight monthly budget in Asian households. You want real mothers to use it, starting with your family, and to learn if the idea is good before building a Flutter app.</div>
+</main>
+<script>
+  const steps = [
+    "Mum signs up and lands on the home page with two buttons.",
+    "She taps “Enter your monthly groceries” and photographs what she bought (or types it).",
+    "Another day, away from home, she taps “Food suggestion” and says she wants roti today.",
+    "The app shows dishes that fit what is in stock, with recipes, and skips what the family ate recently.",
+    "Next day she asks again and gets different dishes. The family keeps using it: that's success."
+  ];
+  let i = 0;
+  const box = document.getElementById("stepbox");
+  const show = () => { box.textContent = (i + 1) + " / " + steps.length + " — " + steps[i]; };
+  document.getElementById("prev").onclick = () => { i = Math.max(0, i - 1); show(); };
+  document.getElementById("next").onclick = () => { i = Math.min(steps.length - 1, i + 1); show(); };
+  show();
+</script>
+</body>
+</html>

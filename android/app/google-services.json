@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "411579240878",
+    "project_id": "cookingapp-8eef2",
+    "storage_bucket": "cookingapp-8eef2.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:411579240878:android:8054f1bf735f6bd6e1f83f",
+        "android_client_info": {
+          "package_name": "com.haleema.what_can_i_cook"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBIU3V5GCyTukAY4bDiUViwa0o35MFbtrY"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

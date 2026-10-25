@@ -1,0 +1,25 @@
+/devpost/learner-profile.md
+.env
+.env.*
+!.env.example
+
+# Flutter / Android build output and local files
+/build/
+.dart_tool/
+.flutter-plugins-dependencies
+.idea/
+*.iml
+/android/local.properties
+/android/.gradle/
+/android/app/debug/
+/android/app/profile/
+/android/app/release/
+firebase-debug.log
+*.log
+
+# Course tooling (not part of the app)
+/.claude/
+/.agents/
+/agent/
+/skills-lock.json
+/devpost/.impeccable/
