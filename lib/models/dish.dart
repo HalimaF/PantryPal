@@ -1,0 +1,31 @@
+/// One suggested dish. Implements prd.md > Dish suggestion.
+class Dish {
+  const Dish({required this.name, required this.why, required this.mainIngredients});
+
+  final String name;
+  final String why; // one friendly line on why it fits today
+  final List<String> mainIngredients;
+}
+
+/// The full recipe shown after tapping a dish.
+class Recipe {
+  const Recipe({required this.ingredients, required this.steps});
+
+  final List<String> ingredients;
+  final List<String> steps;
+}
+
+/// What mum answered on the questions page.
+class SuggestRequest {
+  const SuggestRequest({
+    required this.meal,
+    required this.weight,
+    required this.base,
+    required this.ingredients,
+  });
+
+  final String meal; // Lunch or Dinner
+  final String weight; // Heavy or Light
+  final String base; // Rice, Roti, Bread, Noodles or Any
+  final List<String> ingredients; // what she has at home
+}

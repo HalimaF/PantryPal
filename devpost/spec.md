@@ -49,7 +49,7 @@ Docs:
 - The Gemini API free tier exists and needs no payment method. Models listed as free with image input include `gemini-2.5-flash`, `gemini-2.5-flash-lite` and `gemini-3.5-flash-lite` ([pricing](https://ai.google.dev/gemini-api/docs/pricing)).
 - Firebase AI Logic works on the free Spark plan as long as no billing account is linked; preview and media-generating models may need billing ([Firebase AI Logic pricing](https://firebase.google.com/docs/ai-logic/pricing)).
 - **Free tier data use:** Google says free-tier content is used to improve its products.
-- **Chosen model (agent's pick, easy to change):** `gemini-2.5-flash`, kept in one setting so it can be swapped.
+- **Chosen model:** `gemini-3.8-flash`, kept in one setting so it can be swapped. `gemini-2.5-flash` was tried first and Google rejected it as "no longer available to new users". Whether `gemini-3.8-flash` accepts photos is not stated on the pricing page; `gemini-3.5-flash-lite` is listed with image input and is the fallback for photo steps.
 
 **Still unverified, check first in the build (step 1):**
 - That the chosen model answers a photo request through Firebase AI Logic in this project.
@@ -158,7 +158,7 @@ what_can_i_cook/
 - **Privacy note:** Google states free-tier content is used to improve its products, so family photos and details sent to Gemini fall under that. Fine for a family test; reconsider before a wider launch.
 
 ## Important Failure Modes
-- **Gemini is slow, rate-limited or down** → show "Thinking…", then a friendly message with a Retry button; the text option for groceries still works.
+- **Gemini is slow, rate-limited or down** → the app first tries the second model (`gemini-3.8-flash`, then `gemini-3.5-flash-lite`); if both fail,  show "Thinking…", then a friendly message with a Retry button; the text option for groceries still works.
 - **Gemini returns something that isn't valid JSON, or a wrong item** → catch the error, ask once more, then show "We couldn't read that, please type it." Always show the item name for her to correct.
 - **No internet** → a clear message; nothing is half-saved because writes are one document at a time.
 - **No dish fits the stock** → the empty message from `prd.md > States and Boundaries`.

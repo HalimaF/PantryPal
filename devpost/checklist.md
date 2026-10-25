@@ -19,7 +19,7 @@ Build mode: learn
   Learner check: Open the app, sign up with an email and password, see Home, close the app fully and reopen it, and confirm you are still logged in. Say whether the look feels clean and kitchen-like.
   Commit: `Add Flutter app with Firebase login and Home screen`
 
-- [ ] **2. Ask "what can I cook?" and get dishes and a recipe (the kernel)**
+- [x] **2. Ask "what can I cook?" and get dishes and a recipe (the kernel)**
   Becomes usable: From Home, tap Dish suggestion, answer lunch/dinner, heavy/light, base, and type the ingredients you have; see a list of dishes from Gemini; tap one for the full recipe.
   Why now: This is the unique kernel and the riskiest piece (Gemini through Firebase AI Logic on the free plan). Proving it first means any problem with the model, limits or JSON replies shows up early. It uses the "no groceries entered" path from the PRD, so it needs no stored data yet.
   PRD ref: `prd.md > Features and Behavior > Dish suggestion`, `prd.md > States and Boundaries` (nothing matches)
@@ -91,7 +91,7 @@ Build mode: learn
 
 ## Hands-on Checkpoints
 
-- [ ] Early usable behavior explored — after slice 2 (dishes and recipe from Gemini), because it is the kernel and the riskiest piece
+- [x] Early usable behavior explored — after slice 2 (dishes and recipe from Gemini), because it is the kernel and the riskiest piece
 - [ ] Final kick-the-tires exploration and feedback completed
 
 ## Final Review
@@ -115,4 +115,7 @@ Activity mode: not started
 - Redesigned the login and Home screens with a Fraunces/Nunito type pair, a main "What can I cook?" panel and a calmer layout — the first version looked generic to the learner, so the visual direction in `spec.md > Look and Feel` was applied more carefully.
 - Sign-up now asks for the user's name (kept in the Firebase account) and Home greets them by it — the learner wanted a more personal greeting instead of the email address.
 - Added `kotlin.incremental=false` in `android/gradle.properties` — the Flutter package cache is on C: and the project on D:, which breaks Kotlin's incremental build on Windows.
-
+- Switched the Gemini model from `gemini-2.5-flash` to `gemini-3.8-flash` — Google's live reply said the 2.5 model is no longer available to new users, although its pricing page still lists it. Photo support of the new model still has to be confirmed before slice 7.
+- The Gemini service now tries `gemini-3.8-flash` first and falls back to `gemini-3.5-flash-lite` when a model is busy, missing or slow — the new model answered "high demand" (error 500) on the first real call, so one model was not reliable enough for the kernel.
+- Created the Firestore database (asia-south1) and deployed the per-user security rules during slice 2 instead of slice 8 — the learner asked for the Firebase backend to be set up now, and slice 3 needs the database. Slice 8 no longer needs to write the rules.
+- Gemini calls were failing with "Firebase App Check token is invalid", not model load — App Check enforcement on the AI Logic API blocks an app that does not yet send App Check tokens. For the family test, enforcement is switched off; proper App Check (Play Integrity) is an open item before any wider sharing.

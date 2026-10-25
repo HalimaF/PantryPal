@@ -2,6 +2,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
 import '../theme.dart';
+import 'dish_suggestion_screen.dart';
 
 /// Home hub. Slice 1 only has placeholder actions; later slices fill them in.
 /// Implements prd.md > Screens and Layout (Home dashboard).
@@ -111,7 +112,11 @@ class HomeScreen extends StatelessWidget {
                 ],
               ),
               const SizedBox(height: 24),
-              _CookPanel(onTap: () => _soon(context, 'Dish suggestion')),
+              _CookPanel(
+                onTap: () => Navigator.of(context).push(
+                  MaterialPageRoute(builder: (_) => const DishSuggestionScreen()),
+                ),
+              ),
               const SizedBox(height: 28),
               Text('Your groceries', style: text.titleLarge),
               const SizedBox(height: 12),
