@@ -4,6 +4,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 
 import '../logic/days_left.dart';
 import '../logic/stock_usage.dart';
+import '../models/family_profile.dart';
 import '../models/inventory_item.dart';
 import '../models/meal.dart';
 
@@ -102,6 +103,22 @@ class DataService {
     });
     return batch.commit();
   }
+
+  /// Who she cooks for, read once. Falls back to what the phone has saved if the internet is slow.
+  Future<FamilyProfile> profileOnce() async {
+    DocumentSnapshot<Map<String, dynamic>> doc;
+    try {
+      doc = await _user
+          .get(const GetOptions(source: Source.server))
+          .timeout(const Duration(seconds: 5));
+    } catch (_) {
+      doc = await _user.get(const GetOptions(source: Source.cache));
+    }
+    return FamilyProfile.fromMap(doc.data()?['profile']);
+  }
+
+  Future<void> saveProfile(FamilyProfile profile) =>
+      _user.set({'profile': profile.toMap()}, SetOptions(merge: true));
 
   Stream<ShoppingDates> shoppingDates() => _user.snapshots().map((doc) {
         final data = doc.data() ?? {};

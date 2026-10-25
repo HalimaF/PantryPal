@@ -69,7 +69,7 @@ Build mode: learn
   Learner check: Cook a suggested dish, log it with amounts, and check the Home list went down. Ask for a suggestion again and confirm that dish is not offered.
   Commit: `Add dish logging, daily log and no-repeat suggestions`
 
-- [ ] **6. Family profile shapes the suggestions**
+- [x] **6. Family profile shapes the suggestions**
   Becomes usable: Profile screen saves the number of people with age and gender, country and eating habits (spice, cuisines, who likes what); suggestions reflect them.
   Why now: Personalisation needs the earlier slices in place, and it is the next-most-visible difference in the demo.
   PRD ref: `prd.md > Features and Behavior > Profile`

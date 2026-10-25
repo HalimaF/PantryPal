@@ -9,6 +9,7 @@ import 'add_groceries_screen.dart';
 import 'daily_log_screen.dart';
 import 'dish_suggestion_screen.dart';
 import 'log_dish_screen.dart';
+import 'profile_screen.dart';
 
 /// Home hub: days until the next shopping, what is left, and the way to every other screen.
 /// Implements prd.md > Screens and Layout (Home dashboard).
@@ -32,6 +33,12 @@ class _HomeScreenState extends State<HomeScreen> {
   void _openLogDish() => Navigator.of(context).push(
         MaterialPageRoute(
           builder: (_) => LogDishScreen(stock: _data.inventoryOnce(), onSave: _data.logMeal),
+        ),
+      );
+
+  void _openProfile() => Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => ProfileScreen(load: _data.profileOnce(), onSave: _data.saveProfile),
         ),
       );
 
@@ -69,12 +76,6 @@ class _HomeScreenState extends State<HomeScreen> {
     );
     // The controller is not disposed here: the dialog is still fading out and would crash.
     if (name != null && name.isNotEmpty) await user.updateDisplayName(name);
-  }
-
-  void _soon(BuildContext context, String name) {
-    ScaffoldMessenger.of(context)
-      ..hideCurrentSnackBar()
-      ..showSnackBar(SnackBar(content: Text('$name is coming in the next steps.')));
   }
 
   String _greeting() {
@@ -177,7 +178,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       icon: Icons.family_restroom_rounded,
                       title: 'Family profile',
                       subtitle: 'Tastes, ages and habits',
-                      onTap: () => _soon(context, 'Profile'),
+                      onTap: _openProfile,
                     ),
                   ],
                 ),

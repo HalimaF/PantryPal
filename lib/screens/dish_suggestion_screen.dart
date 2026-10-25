@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../models/dish.dart';
+import '../models/family_profile.dart';
 import '../models/inventory_item.dart';
 import '../services/data_service.dart';
 import '../services/dish_database.dart';
@@ -23,6 +24,7 @@ class DishSuggestionScreen extends StatefulWidget {
     this.database,
     this.stock,
     this.recentMeals,
+    this.profile,
     this.data,
   });
 
@@ -34,6 +36,9 @@ class DishSuggestionScreen extends StatefulWidget {
 
   /// Dishes cooked in the last week; they are not suggested again.
   final Future<Set<String>>? recentMeals;
+
+  /// Who she cooks for; spice, kids and favourite cuisines shape which dishes come first.
+  final Future<FamilyProfile>? profile;
 
   /// Lets the recipe page log a cooked dish. Also supplies [stock] and [recentMeals] when not given.
   final DataService? data;
@@ -58,6 +63,7 @@ class _DishSuggestionScreenState extends State<DishSuggestionScreen> {
 
   List<InventoryItem> _stock = const [];
   Set<String> _recent = const {};
+  FamilyProfile _profile = FamilyProfile.empty;
   bool _stockLoaded = false;
 
   @override
@@ -71,7 +77,8 @@ class _DishSuggestionScreenState extends State<DishSuggestionScreen> {
   Future<void> _load() async {
     final stockLoading = widget.stock ?? widget.data?.inventoryOnce();
     final recentLoading = widget.recentMeals ?? widget.data?.recentMealNames();
-    if (stockLoading == null && recentLoading == null) {
+    final profileLoading = widget.profile ?? widget.data?.profileOnce();
+    if (stockLoading == null && recentLoading == null && profileLoading == null) {
       _stockLoaded = true;
       return;
     }
@@ -84,10 +91,12 @@ class _DishSuggestionScreenState extends State<DishSuggestionScreen> {
 
     final stock = await safely<List<InventoryItem>>(stockLoading, const []);
     final recent = await safely<Set<String>>(recentLoading, const {});
+    final profile = await safely<FamilyProfile>(profileLoading, FamilyProfile.empty);
     if (!mounted) return;
     setState(() {
       _stock = stock;
       _recent = recent;
+      _profile = profile;
       _stockLoaded = true;
     });
   }
@@ -121,6 +130,7 @@ class _DishSuggestionScreenState extends State<DishSuggestionScreen> {
             ]
           : const [],
       recentMeals: _recent.toList(),
+      profile: _profile,
     );
     if (!more) _shown.clear();
     setState(() {

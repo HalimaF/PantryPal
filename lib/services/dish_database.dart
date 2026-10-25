@@ -4,6 +4,7 @@ import 'package:csv/csv.dart';
 import 'package:flutter/services.dart' show rootBundle;
 
 import '../models/dish.dart';
+import '../models/family_profile.dart';
 import 'ingredient_matcher.dart';
 
 /// One row of the learner's own recipe book (`data/dishes.csv`).
@@ -118,24 +119,51 @@ class DishDatabase {
     }
   }
 
+  /// How well a dish suits the family: spice level, kids, and favourite cuisines.
+  /// Only used to order dishes that are equally good on ingredients.
+  static int _profileFit(DishRecord d, FamilyProfile profile) {
+    var fit = 0;
+    switch (profile.spice) {
+      case 'Mild':
+        fit += d.spice == 'mild' ? 2 : (d.spice == 'medium' ? 1 : 0);
+      case 'Medium':
+        fit += d.spice == 'medium' ? 2 : (d.spice == 'mild' ? 1 : 0);
+      case 'Hot':
+        fit += d.spice == 'hot' ? 2 : (d.spice == 'medium' ? 1 : 0);
+    }
+    if (profile.childCount > 0 && d.kidFriendly) fit += 2;
+    if (profile.cuisines.any((c) => c.toLowerCase() == d.cuisine.toLowerCase())) fit += 1;
+    return fit;
+  }
+
   /// Dishes that fit the answers, best match first. A dish needs at least half of its
   /// main ingredients to be available. [exclude] holds names already shown.
   List<Dish> suggest(SuggestRequest request, {Set<String> exclude = const {}, int limit = 5}) {
     final have = typedIngredients(request.ingredients);
     final skip = {for (final name in exclude) name.trim().toLowerCase()};
-    final scored = <({DishRecord record, double coverage, int matched, bool exactWeight})>[];
+    final profile = request.profile;
+    final scored =
+        <({DishRecord record, double coverage, int matched, bool exactWeight, int fit})>[];
 
     for (final d in records) {
       if (skip.contains(d.name.toLowerCase())) continue;
       if (!_mealFits(d) || !_weightFits(request.weight, d) || !_baseFits(request.base, d)) continue;
       final core = d.coreIngredients;
       if (core.isEmpty) continue;
+      // Someone who wants mild food is never offered the hot dishes.
+      if (profile.spice == 'Mild' && d.spice == 'hot') continue;
       final matched = core.where(have.contains).length;
       if (matched == 0) continue;
       final coverage = matched / core.length;
       if (coverage < 0.5) continue;
       final exactWeight = request.weight.toLowerCase() == d.weight;
-      scored.add((record: d, coverage: coverage, matched: matched, exactWeight: exactWeight));
+      scored.add((
+        record: d,
+        coverage: coverage,
+        matched: matched,
+        exactWeight: exactWeight,
+        fit: _profileFit(d, profile),
+      ));
     }
 
     // Shuffle first so equally good dishes change each time; the sort keeps the best on top.
@@ -143,6 +171,8 @@ class DishDatabase {
     scored.sort((a, b) {
       final byCoverage = b.coverage.compareTo(a.coverage);
       if (byCoverage != 0) return byCoverage;
+      final byFit = b.fit.compareTo(a.fit);
+      if (byFit != 0) return byFit;
       final byWeight = (b.exactWeight ? 1 : 0).compareTo(a.exactWeight ? 1 : 0);
       if (byWeight != 0) return byWeight;
       return b.matched.compareTo(a.matched);

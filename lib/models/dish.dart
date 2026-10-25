@@ -1,3 +1,5 @@
+import 'family_profile.dart';
+
 /// One suggested dish. Implements prd.md > Dish suggestion.
 class Dish {
   const Dish({
@@ -34,6 +36,7 @@ class SuggestRequest {
     required this.ingredients,
     this.stockDetails = const [],
     this.recentMeals = const [],
+    this.profile = FamilyProfile.empty,
   });
 
   final String meal; // Lunch or Dinner
@@ -46,4 +49,7 @@ class SuggestRequest {
 
   /// Dishes the family ate in the last week; they are not suggested again.
   final List<String> recentMeals;
+
+  /// Who she cooks for and what they like.
+  final FamilyProfile profile;
 }
