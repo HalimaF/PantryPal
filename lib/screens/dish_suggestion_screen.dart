@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../models/dish.dart';
+import '../services/dish_database.dart';
 import '../services/gemini_service.dart';
 import '../theme.dart';
 import 'recipe_screen.dart';
@@ -14,9 +15,10 @@ List<String> splitIngredients(String raw) => raw
 
 /// Questions, then dishes. Implements prd.md > Features and Behavior > Dish suggestion.
 class DishSuggestionScreen extends StatefulWidget {
-  const DishSuggestionScreen({super.key, this.gemini});
+  const DishSuggestionScreen({super.key, this.gemini, this.database});
 
   final GeminiService? gemini;
+  final DishDatabase? database;
 
   @override
   State<DishSuggestionScreen> createState() => _DishSuggestionScreenState();
@@ -34,6 +36,7 @@ class _DishSuggestionScreenState extends State<DishSuggestionScreen> {
   String? _error;
   SuggestRequest? _request;
   List<Dish>? _dishes;
+  final Set<String> _shown = {};
 
   @override
   void dispose() {
@@ -41,19 +44,25 @@ class _DishSuggestionScreenState extends State<DishSuggestionScreen> {
     super.dispose();
   }
 
-  Future<void> _ask() async {
+  /// Your recipe book first (instant); Gemini only when it has nothing that fits.
+  /// [more] asks for different dishes than the ones already shown.
+  Future<void> _ask({bool more = false}) async {
     final items = splitIngredients(_ingredients.text);
     if (items.isEmpty) {
       setState(() => _error = 'Please type a few things you have at home.');
       return;
     }
     final request = SuggestRequest(meal: _meal, weight: _weight, base: _base, ingredients: items);
+    if (!more) _shown.clear();
     setState(() {
       _loading = true;
       _error = null;
     });
     try {
-      final dishes = await _gemini.suggestDishes(request);
+      final book = widget.database ?? await DishDatabase.load();
+      var dishes = book.suggest(request, exclude: _shown);
+      if (dishes.isEmpty) dishes = await _gemini.suggestDishes(request);
+      _shown.addAll(dishes.map((d) => d.name));
       if (!mounted) return;
       setState(() {
         _request = request;
@@ -88,7 +97,7 @@ class _DishSuggestionScreenState extends State<DishSuggestionScreen> {
                     dishes: _dishes!,
                     request: _request!,
                     gemini: _gemini,
-                    onRefresh: _ask,
+                    onRefresh: () => _ask(more: true),
                   )
                 : _Questions(
                     meal: _meal,
@@ -272,6 +281,13 @@ class _Results extends StatelessWidget {
       children: [
         Text('${request.meal}, ${request.weight.toLowerCase()}, with ${request.base.toLowerCase()}',
             style: text.bodyMedium?.copyWith(color: mutedBrown, fontSize: 16)),
+        const SizedBox(height: 4),
+        Text(
+          dishes.every((d) => d.fromDatabase)
+              ? 'From your own recipe book'
+              : 'Ideas from the cooking helper',
+          style: text.bodyMedium?.copyWith(color: leafGreen, fontWeight: FontWeight.w700),
+        ),
         const SizedBox(height: 14),
         for (final dish in dishes) ...[
           Material(

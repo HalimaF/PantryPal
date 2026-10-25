@@ -29,6 +29,16 @@ Build mode: learn
   Learner check: Type "chicken, onion, rice, yogurt", choose dinner, light, rice, and say whether the dishes make sense for a home cook and the recipe is easy to follow.
   Commit: `Add dish suggestions and recipes from Gemini`
 
+- [x] **2b. Dishes and recipes come from your own recipe book first**
+  Becomes usable: Dish suggestions are picked instantly from the learner's own `data/dishes.csv` (1,003 dishes), matched on meal, weight, base and the ingredients typed; the recipe opens straight from the file. Gemini is used only when the recipe book has nothing that fits.
+  Why now: The learner found Gemini too slow and wrote the database themselves; it makes the kernel instant and puts their own recipes in front of their family. It builds directly on slice 2 and must exist before the stock-based suggestions in slice 4.
+  PRD ref: `prd.md > Features and Behavior > Dish suggestion`
+  Spec ref: `spec.md > Components > Dish suggestion screen and Recipe screen`, `spec.md > Components > Gemini service`
+  Build: Bundle `data/dishes.csv` as an app asset, parse it, normalise ingredient names (egg/eggs, potato/aloo, rice/basmati rice, and ignore non-ingredients such as "tarka"), filter by meal/weight/base, rank by how many main ingredients are available, skip dishes already shown, show recipes straight from the file, fall back to Gemini when nothing fits.
+  Verify (mechanical): Unit tests for CSV parsing, ingredient matching, filtering, ranking and fallback; a test that loads the real `data/dishes.csv` and checks every dish has ingredients and steps; `flutter analyze` clean.
+  Learner check: Ask for dinner, light, rice with "chicken, onion, rice, yogurt"; dishes should appear instantly from your recipe book and open with your own recipe. Then ask for noodles and confirm the app still returns ideas (from Gemini, since the recipe book has no noodles dishes).
+  Commit: `Suggest dishes from the learner's own recipe database first`
+
 - [ ] **3. Add groceries by text, see them on Home with days until shopping**
   Becomes usable: Tap Add groceries, choose By text, enter item, quantity and weight, and set the shopping date; Home shows days until the next shopping and the remaining list with a total. Data is still there after restarting the app.
   Why now: Gives the app its memory (Firestore) and the dashboard, using plain typing, which is the safe path before photos.
@@ -119,3 +129,5 @@ Activity mode: not started
 - The Gemini service now tries `gemini-3.8-flash` first and falls back to `gemini-3.5-flash-lite` when a model is busy, missing or slow — the new model answered "high demand" (error 500) on the first real call, so one model was not reliable enough for the kernel.
 - Created the Firestore database (asia-south1) and deployed the per-user security rules during slice 2 instead of slice 8 — the learner asked for the Firebase backend to be set up now, and slice 3 needs the database. Slice 8 no longer needs to write the rules.
 - Gemini calls were failing with "Firebase App Check token is invalid", not model load — App Check enforcement on the AI Logic API blocks an app that does not yet send App Check tokens. For the family test, enforcement is switched off; proper App Check (Play Integrity) is an open item before any wider sharing.
+- Added slice 2b so suggestions come from the learner's own dish database first, with Gemini as backup — the learner found Gemini too slow and chose to write the database themselves (1,003 Pakistani dishes). This reverses `spec.md`'s "AI-written dishes on demand"; the recipe-saving idea is dropped.
+- Added a variety rule to the recipe-book matcher (at most two dishes with identical main ingredients per result) — the first real preview returned five biryani variants for one request.

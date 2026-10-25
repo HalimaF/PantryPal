@@ -1,10 +1,20 @@
 /// One suggested dish. Implements prd.md > Dish suggestion.
 class Dish {
-  const Dish({required this.name, required this.why, required this.mainIngredients});
+  const Dish({
+    required this.name,
+    required this.why,
+    required this.mainIngredients,
+    this.recipe,
+    this.fromDatabase = false,
+  });
 
   final String name;
   final String why; // one friendly line on why it fits today
   final List<String> mainIngredients;
+
+  /// Set for dishes from the learner's own recipe book, so no waiting for Gemini.
+  final Recipe? recipe;
+  final bool fromDatabase;
 }
 
 /// The full recipe shown after tapping a dish.

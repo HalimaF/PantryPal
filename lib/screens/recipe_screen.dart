@@ -24,7 +24,10 @@ class RecipeScreen extends StatefulWidget {
 class _RecipeScreenState extends State<RecipeScreen> {
   late Future<Recipe> _recipe = _load();
 
-  Future<Recipe> _load() => widget.gemini.getRecipe(widget.dish.name, widget.request.ingredients);
+  /// Dishes from the recipe book already carry their recipe; only Gemini ideas need a request.
+  Future<Recipe> _load() => widget.dish.recipe != null
+      ? Future.value(widget.dish.recipe!)
+      : widget.gemini.getRecipe(widget.dish.name, widget.request.ingredients);
 
   @override
   Widget build(BuildContext context) {
@@ -33,9 +36,10 @@ class _RecipeScreenState extends State<RecipeScreen> {
       appBar: AppBar(),
       body: SafeArea(
         child: FutureBuilder<Recipe>(
+          initialData: widget.dish.recipe,
           future: _recipe,
           builder: (context, snapshot) {
-            if (snapshot.connectionState != ConnectionState.done) {
+            if (!snapshot.hasData && snapshot.connectionState != ConnectionState.done) {
               return Center(
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
