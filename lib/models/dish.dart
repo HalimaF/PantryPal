@@ -32,10 +32,14 @@ class SuggestRequest {
     required this.weight,
     required this.base,
     required this.ingredients,
+    this.stockDetails = const [],
   });
 
   final String meal; // Lunch or Dinner
   final String weight; // Heavy or Light
   final String base; // Rice, Roti, Bread, Noodles or Any
   final List<String> ingredients; // what she has at home
+
+  /// The same items with amounts ("Chicken 1.5 kg"), so Gemini can see how much is left.
+  final List<String> stockDetails;
 }

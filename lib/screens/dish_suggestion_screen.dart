@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../models/dish.dart';
+import '../models/inventory_item.dart';
 import '../services/dish_database.dart';
 import '../services/gemini_service.dart';
 import '../theme.dart';
@@ -15,10 +16,18 @@ List<String> splitIngredients(String raw) => raw
 
 /// Questions, then dishes. Implements prd.md > Features and Behavior > Dish suggestion.
 class DishSuggestionScreen extends StatefulWidget {
-  const DishSuggestionScreen({super.key, this.gemini, this.database});
+  const DishSuggestionScreen({
+    super.key,
+    this.gemini,
+    this.database,
+    this.stock,
+  });
 
   final GeminiService? gemini;
   final DishDatabase? database;
+
+  /// Her groceries. When there are some, the screen uses them instead of asking what she has.
+  final Future<List<InventoryItem>>? stock;
 
   @override
   State<DishSuggestionScreen> createState() => _DishSuggestionScreenState();
@@ -38,6 +47,33 @@ class _DishSuggestionScreenState extends State<DishSuggestionScreen> {
   List<Dish>? _dishes;
   final Set<String> _shown = {};
 
+  List<InventoryItem> _stock = const [];
+  bool _stockLoaded = false;
+
+  @override
+  void initState() {
+    super.initState();
+    final loading = widget.stock;
+    if (loading == null) {
+      _stockLoaded = true;
+      return;
+    }
+    // Never leave her stuck: if the groceries do not arrive in time, ask what she has instead.
+    loading
+        .timeout(const Duration(seconds: 8))
+        .then((items) {
+          if (!mounted) return;
+          setState(() {
+            _stock = items;
+            _stockLoaded = true;
+          });
+        })
+        .catchError((_) {
+          // If her groceries cannot be read, fall back to asking what she has.
+          if (mounted) setState(() => _stockLoaded = true);
+        });
+  }
+
   @override
   void dispose() {
     _ingredients.dispose();
@@ -47,12 +83,26 @@ class _DishSuggestionScreenState extends State<DishSuggestionScreen> {
   /// Your recipe book first (instant); Gemini only when it has nothing that fits.
   /// [more] asks for different dishes than the ones already shown.
   Future<void> _ask({bool more = false}) async {
-    final items = splitIngredients(_ingredients.text);
+    final usingStock = _stock.isNotEmpty;
+    final items = usingStock
+        ? [for (final i in _stock) i.name]
+        : splitIngredients(_ingredients.text);
     if (items.isEmpty) {
       setState(() => _error = 'Please type a few things you have at home.');
       return;
     }
-    final request = SuggestRequest(meal: _meal, weight: _weight, base: _base, ingredients: items);
+    final request = SuggestRequest(
+      meal: _meal,
+      weight: _weight,
+      base: _base,
+      ingredients: items,
+      stockDetails: usingStock
+          ? [
+              for (final i in _stock)
+                '${i.name} ${formatAmount(i.amount)} ${i.unit}',
+            ]
+          : const [],
+    );
     if (!more) _shown.clear();
     setState(() {
       _loading = true;
@@ -93,23 +143,25 @@ class _DishSuggestionScreenState extends State<DishSuggestionScreen> {
         child: _loading
             ? const _Thinking()
             : showingResults
-                ? _Results(
-                    dishes: _dishes!,
-                    request: _request!,
-                    gemini: _gemini,
-                    onRefresh: () => _ask(more: true),
-                  )
-                : _Questions(
-                    meal: _meal,
-                    weight: _weight,
-                    base: _base,
-                    ingredients: _ingredients,
-                    error: _error,
-                    onMeal: (v) => setState(() => _meal = v),
-                    onWeight: (v) => setState(() => _weight = v),
-                    onBase: (v) => setState(() => _base = v),
-                    onAsk: _ask,
-                  ),
+            ? _Results(
+                dishes: _dishes!,
+                request: _request!,
+                gemini: _gemini,
+                onRefresh: () => _ask(more: true),
+              )
+            : _Questions(
+                meal: _meal,
+                weight: _weight,
+                base: _base,
+                ingredients: _ingredients,
+                stock: _stock,
+                stockLoaded: _stockLoaded,
+                error: _error,
+                onMeal: (v) => setState(() => _meal = v),
+                onWeight: (v) => setState(() => _weight = v),
+                onBase: (v) => setState(() => _base = v),
+                onAsk: _ask,
+              ),
       ),
     );
   }
@@ -126,7 +178,10 @@ class _Thinking extends StatelessWidget {
         children: [
           const CircularProgressIndicator(),
           const SizedBox(height: 20),
-          Text('Thinking of dishes…', style: Theme.of(context).textTheme.titleLarge),
+          Text(
+            'Thinking of dishes…',
+            style: Theme.of(context).textTheme.titleLarge,
+          ),
         ],
       ),
     );
@@ -139,6 +194,8 @@ class _Questions extends StatelessWidget {
     required this.weight,
     required this.base,
     required this.ingredients,
+    required this.stock,
+    required this.stockLoaded,
     required this.error,
     required this.onMeal,
     required this.onWeight,
@@ -150,6 +207,8 @@ class _Questions extends StatelessWidget {
   final String weight;
   final String base;
   final TextEditingController ingredients;
+  final List<InventoryItem> stock;
+  final bool stockLoaded;
   final String? error;
   final ValueChanged<String> onMeal;
   final ValueChanged<String> onWeight;
@@ -182,29 +241,79 @@ class _Questions extends StatelessWidget {
           selected: base,
           onSelected: onBase,
         ),
-        Text('What do you have at home?', style: text.titleMedium),
-        const SizedBox(height: 10),
-        TextField(
-          controller: ingredients,
-          minLines: 3,
-          maxLines: 5,
-          textCapitalization: TextCapitalization.sentences,
-          decoration: const InputDecoration(
-            hintText: 'For example: chicken, onion, rice, yogurt',
-            helperText: 'Separate with commas',
+        if (!stockLoaded)
+          const Padding(
+            padding: EdgeInsets.symmetric(vertical: 12),
+            child: Center(child: CircularProgressIndicator()),
+          )
+        else if (stock.isNotEmpty)
+          _StockCard(items: stock)
+        else ...[
+          Text('What do you have at home?', style: text.titleMedium),
+          const SizedBox(height: 10),
+          TextField(
+            controller: ingredients,
+            minLines: 3,
+            maxLines: 5,
+            textCapitalization: TextCapitalization.sentences,
+            decoration: const InputDecoration(
+              hintText: 'For example: chicken, onion, rice, yogurt',
+              helperText: 'Separate with commas',
+            ),
           ),
-        ),
+        ],
         if (error != null) ...[
           const SizedBox(height: 14),
           _ErrorBox(message: error!),
         ],
         const SizedBox(height: 24),
         FilledButton.icon(
-          onPressed: onAsk,
+          onPressed: stockLoaded ? onAsk : null,
           icon: const Icon(Icons.restaurant_menu_rounded),
           label: const Text('Show me dishes'),
         ),
       ],
+    );
+  }
+}
+
+/// Shown instead of the "what do you have?" box when her groceries are already saved.
+class _StockCard extends StatelessWidget {
+  const _StockCard({required this.items});
+  final List<InventoryItem> items;
+
+  @override
+  Widget build(BuildContext context) {
+    final text = Theme.of(context).textTheme;
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: lineTan),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.kitchen_rounded, color: leafGreen),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  'Using what is in your kitchen',
+                  style: text.titleMedium,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Text(
+            items.map((i) => i.name).join(', '),
+            style: text.bodyLarge?.copyWith(color: mutedBrown, height: 1.4),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -249,8 +358,13 @@ class _Group extends StatelessWidget {
                   selectedColor: terracotta,
                   backgroundColor: Colors.white,
                   side: const BorderSide(color: lineTan),
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 10,
+                  ),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(14),
+                  ),
                 ),
             ],
           ),
@@ -279,14 +393,19 @@ class _Results extends StatelessWidget {
     return ListView(
       padding: const EdgeInsets.fromLTRB(20, 4, 20, 32),
       children: [
-        Text('${request.meal}, ${request.weight.toLowerCase()}, with ${request.base.toLowerCase()}',
-            style: text.bodyMedium?.copyWith(color: mutedBrown, fontSize: 16)),
+        Text(
+          '${request.meal}, ${request.weight.toLowerCase()}, with ${request.base.toLowerCase()}',
+          style: text.bodyMedium?.copyWith(color: mutedBrown, fontSize: 16),
+        ),
         const SizedBox(height: 4),
         Text(
           dishes.every((d) => d.fromDatabase)
               ? 'From your own recipe book'
               : 'Ideas from the cooking helper',
-          style: text.bodyMedium?.copyWith(color: leafGreen, fontWeight: FontWeight.w700),
+          style: text.bodyMedium?.copyWith(
+            color: leafGreen,
+            fontWeight: FontWeight.w700,
+          ),
         ),
         const SizedBox(height: 14),
         for (final dish in dishes) ...[
@@ -295,9 +414,15 @@ class _Results extends StatelessWidget {
             borderRadius: BorderRadius.circular(20),
             clipBehavior: Clip.antiAlias,
             child: InkWell(
-              onTap: () => Navigator.of(context).push(MaterialPageRoute(
-                builder: (_) => RecipeScreen(dish: dish, request: request, gemini: gemini),
-              )),
+              onTap: () => Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) => RecipeScreen(
+                    dish: dish,
+                    request: request,
+                    gemini: gemini,
+                  ),
+                ),
+              ),
               child: Container(
                 padding: const EdgeInsets.all(18),
                 decoration: BoxDecoration(
@@ -312,12 +437,21 @@ class _Results extends StatelessWidget {
                         children: [
                           Text(dish.name, style: text.titleLarge),
                           const SizedBox(height: 6),
-                          Text(dish.why,
-                              style: text.bodyMedium?.copyWith(color: mutedBrown, fontSize: 16)),
+                          Text(
+                            dish.why,
+                            style: text.bodyMedium?.copyWith(
+                              color: mutedBrown,
+                              fontSize: 16,
+                            ),
+                          ),
                           const SizedBox(height: 8),
-                          Text(dish.mainIngredients.join(' · '),
-                              style: text.bodyMedium?.copyWith(
-                                  color: terracotta, fontWeight: FontWeight.w700)),
+                          Text(
+                            dish.mainIngredients.join(' · '),
+                            style: text.bodyMedium?.copyWith(
+                              color: terracotta,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
                         ],
                       ),
                     ),
@@ -335,7 +469,9 @@ class _Results extends StatelessWidget {
             minimumSize: const Size.fromHeight(52),
             foregroundColor: terracotta,
             side: const BorderSide(color: terracotta),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
+            ),
           ),
           onPressed: onRefresh,
           icon: const Icon(Icons.refresh_rounded),
@@ -363,7 +499,10 @@ class _ErrorBox extends StatelessWidget {
           const Icon(Icons.error_outline_rounded, color: Color(0xFFB3261E)),
           const SizedBox(width: 10),
           Expanded(
-            child: Text(message, style: const TextStyle(color: Color(0xFF7A1A14), fontSize: 15)),
+            child: Text(
+              message,
+              style: const TextStyle(color: Color(0xFF7A1A14), fontSize: 15),
+            ),
           ),
         ],
       ),

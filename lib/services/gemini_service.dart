@@ -105,7 +105,8 @@ Future<String> generateWithFallback(
 }
 
 String buildSuggestPrompt(SuggestRequest r) {
-  final have = r.ingredients.isEmpty ? 'not specified' : r.ingredients.join(', ');
+  final items = r.stockDetails.isNotEmpty ? r.stockDetails : r.ingredients;
+  final have = items.isEmpty ? 'not specified' : items.join(', ');
   final base = r.base == 'Any' ? 'any staple' : r.base.toLowerCase();
   return '''
 You are a friendly home-cooking helper for a family in an Asian household.

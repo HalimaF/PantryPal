@@ -49,7 +49,7 @@ Build mode: learn
   Learner check: Add chicken 1 kg and rice 5 kg with a shopping date of today, check that Home shows the right days until next month's date and both items, then restart the app and confirm they are still there.
   Commit: `Add text groceries, Home dashboard and days until shopping`
 
-- [ ] **4. Suggestions use the stored groceries**
+- [x] **4. Suggestions use the stored groceries**
   Becomes usable: Dish suggestion skips the "what do you have?" question when groceries exist and suggests dishes from the stock.
   Why now: This makes the app personal to her month, the heart of the kernel, and it connects slices 2 and 3.
   PRD ref: `prd.md > Features and Behavior > Dish suggestion`
@@ -131,3 +131,4 @@ Activity mode: not started
 - Gemini calls were failing with "Firebase App Check token is invalid", not model load — App Check enforcement on the AI Logic API blocks an app that does not yet send App Check tokens. For the family test, enforcement is switched off; proper App Check (Play Integrity) is an open item before any wider sharing.
 - Added slice 2b so suggestions come from the learner's own dish database first, with Gemini as backup — the learner found Gemini too slow and chose to write the database themselves (1,003 Pakistani dishes). This reverses `spec.md`'s "AI-written dishes on demand"; the recipe-saving idea is dropped.
 - Added a variety rule to the recipe-book matcher (at most two dishes with identical main ingredients per result) — the first real preview returned five biryani variants for one request.
+- Suggestions now read the groceries once with a direct read instead of re-listening to Home's live feed, and fall back to the text box after 8 seconds — a second listener on an already-open Firestore feed never receives the current list, which left the screen waiting forever.

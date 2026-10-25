@@ -134,7 +134,7 @@ class _HomeScreenState extends State<HomeScreen> {
               const SizedBox(height: 24),
               _CookPanel(
                 onTap: () => Navigator.of(context).push(
-                  MaterialPageRoute(builder: (_) => const DishSuggestionScreen()),
+                  MaterialPageRoute(builder: (_) => DishSuggestionScreen(stock: _data.inventoryOnce())),
                 ),
               ),
               const SizedBox(height: 28),

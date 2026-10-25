@@ -25,11 +25,28 @@ class DataService {
   CollectionReference<Map<String, dynamic>> get _inventory => _user.collection('inventory');
 
   /// Her groceries, A to Z. Updates by itself whenever anything changes.
-  Stream<List<InventoryItem>> inventory() => _inventory.snapshots().map((snapshot) {
-        final items = snapshot.docs.map(InventoryItem.fromDoc).where((i) => i.amount > 0).toList();
-        items.sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
-        return items;
-      });
+  Stream<List<InventoryItem>> inventory() => _inventory.snapshots().map(_toItems);
+
+  /// Her groceries, read once right now. A second listener on a live feed that is already
+  /// open gets nothing until the next change, so screens that only need the current list
+  /// use this instead. Falls back to what the phone has saved if the internet is slow.
+  Future<List<InventoryItem>> inventoryOnce() async {
+    QuerySnapshot<Map<String, dynamic>> snapshot;
+    try {
+      snapshot = await _inventory
+          .get(const GetOptions(source: Source.server))
+          .timeout(const Duration(seconds: 5));
+    } catch (_) {
+      snapshot = await _inventory.get(const GetOptions(source: Source.cache));
+    }
+    return _toItems(snapshot);
+  }
+
+  List<InventoryItem> _toItems(QuerySnapshot<Map<String, dynamic>> snapshot) {
+    final items = snapshot.docs.map(InventoryItem.fromDoc).where((i) => i.amount > 0).toList();
+    items.sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
+    return items;
+  }
 
   Stream<ShoppingDates> shoppingDates() => _user.snapshots().map((doc) {
         final data = doc.data() ?? {};
