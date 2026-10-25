@@ -39,7 +39,7 @@ Build mode: learn
   Learner check: Ask for dinner, light, rice with "chicken, onion, rice, yogurt"; dishes should appear instantly from your recipe book and open with your own recipe. Then ask for noodles and confirm the app still returns ideas (from Gemini, since the recipe book has no noodles dishes).
   Commit: `Suggest dishes from the learner's own recipe database first`
 
-- [ ] **3. Add groceries by text, see them on Home with days until shopping**
+- [x] **3. Add groceries by text, see them on Home with days until shopping**
   Becomes usable: Tap Add groceries, choose By text, enter item, quantity and weight, and set the shopping date; Home shows days until the next shopping and the remaining list with a total. Data is still there after restarting the app.
   Why now: Gives the app its memory (Firestore) and the dashboard, using plain typing, which is the safe path before photos.
   PRD ref: `prd.md > Features and Behavior > Add groceries`, `prd.md > Features and Behavior > Home dashboard`, `prd.md > States and Boundaries` (first use, persistence)

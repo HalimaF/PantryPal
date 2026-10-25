@@ -1,15 +1,35 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
+import '../logic/days_left.dart';
+import '../models/inventory_item.dart';
+import '../services/data_service.dart';
 import '../theme.dart';
+import 'add_groceries_screen.dart';
 import 'dish_suggestion_screen.dart';
 
-/// Home hub. Slice 1 only has placeholder actions; later slices fill them in.
+/// Home hub: days until the next shopping, what is left, and the way to every other screen.
 /// Implements prd.md > Screens and Layout (Home dashboard).
-class HomeScreen extends StatelessWidget {
+class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key, required this.user});
 
   final User user;
+
+  @override
+  State<HomeScreen> createState() => _HomeScreenState();
+}
+
+class _HomeScreenState extends State<HomeScreen> {
+  User get user => widget.user;
+
+  // Made once, so the lists below are not reloaded every time the screen redraws.
+  late final DataService _data = DataService(widget.user.uid);
+  late final Stream<List<InventoryItem>> _inventory = _data.inventory();
+  late final Stream<ShoppingDates> _dates = _data.shoppingDates();
+
+  void _openAddGroceries() => Navigator.of(context).push(
+        MaterialPageRoute(builder: (_) => AddGroceriesScreen(data: _data)),
+      );
 
   Future<void> _askName(BuildContext context) async {
     final controller = TextEditingController();
@@ -120,7 +140,7 @@ class HomeScreen extends StatelessWidget {
               const SizedBox(height: 28),
               Text('Your groceries', style: text.titleLarge),
               const SizedBox(height: 12),
-              _GroceriesEmpty(onAdd: () => _soon(context, 'Add groceries')),
+              _Groceries(inventory: _inventory, dates: _dates, onAdd: _openAddGroceries),
               const SizedBox(height: 28),
               Text('More', style: text.titleLarge),
               const SizedBox(height: 12),
@@ -216,6 +236,121 @@ class _CookPanel extends StatelessWidget {
       ),
     );
   }
+}
+
+/// Add button, then either the empty message or the dashboard.
+class _Groceries extends StatelessWidget {
+  const _Groceries({required this.inventory, required this.dates, required this.onAdd});
+
+  final Stream<List<InventoryItem>> inventory;
+  final Stream<ShoppingDates> dates;
+  final VoidCallback onAdd;
+
+  @override
+  Widget build(BuildContext context) {
+    return StreamBuilder<List<InventoryItem>>(
+      stream: inventory,
+      builder: (context, snapshot) {
+        if (snapshot.hasError) {
+          return const _Message('Could not load your groceries. Please check your internet.');
+        }
+        if (!snapshot.hasData) {
+          return const Padding(
+            padding: EdgeInsets.symmetric(vertical: 24),
+            child: Center(child: CircularProgressIndicator()),
+          );
+        }
+        final items = snapshot.data!;
+        if (items.isEmpty) return _GroceriesEmpty(onAdd: onAdd);
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            FilledButton.tonalIcon(
+              style: FilledButton.styleFrom(
+                backgroundColor: terracottaSoft,
+                foregroundColor: terracotta,
+              ),
+              onPressed: onAdd,
+              icon: const Icon(Icons.add_rounded),
+              label: const Text('Add groceries'),
+            ),
+            const SizedBox(height: 12),
+            StreamBuilder<ShoppingDates>(
+              stream: dates,
+              builder: (context, snap) => _Dashboard(items: items, next: snap.data?.next),
+            ),
+          ],
+        );
+      },
+    );
+  }
+}
+
+/// Days until the next shopping, what is left, and the total, so mum can judge for herself.
+class _Dashboard extends StatelessWidget {
+  const _Dashboard({required this.items, required this.next});
+  final List<InventoryItem> items;
+  final DateTime? next;
+
+  @override
+  Widget build(BuildContext context) {
+    final text = Theme.of(context).textTheme;
+    return Container(
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: lineTan),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(daysUntilMessage(DateTime.now(), next), style: text.titleMedium),
+          const SizedBox(height: 14),
+          for (final item in items)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 5),
+              child: Row(
+                children: [
+                  Expanded(child: Text(item.name, style: text.bodyLarge)),
+                  Text('${formatAmount(item.amount)} ${item.unit}',
+                      style: text.bodyLarge?.copyWith(fontWeight: FontWeight.w700)),
+                ],
+              ),
+            ),
+          const Divider(height: 24, color: lineTan),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('Total left', style: text.titleMedium),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  describeTotals(totalsByUnit(items)),
+                  textAlign: TextAlign.right,
+                  style: text.titleMedium?.copyWith(color: leafGreen),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          Text('Amounts are approximate.',
+              style: text.bodyMedium?.copyWith(color: mutedBrown, fontSize: 14)),
+        ],
+      ),
+    );
+  }
+}
+
+class _Message extends StatelessWidget {
+  const _Message(this.text);
+  final String text;
+
+  @override
+  Widget build(BuildContext context) => Padding(
+        padding: const EdgeInsets.symmetric(vertical: 12),
+        child: Text(text, style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: mutedBrown)),
+      );
 }
 
 /// Shown until the first groceries are added (prd.md > States and Boundaries).
