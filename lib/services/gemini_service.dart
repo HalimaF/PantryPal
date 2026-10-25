@@ -108,12 +108,15 @@ String buildSuggestPrompt(SuggestRequest r) {
   final items = r.stockDetails.isNotEmpty ? r.stockDetails : r.ingredients;
   final have = items.isEmpty ? 'not specified' : items.join(', ');
   final base = r.base == 'Any' ? 'any staple' : r.base.toLowerCase();
+  final recent = r.recentMeals.isEmpty
+      ? ''
+      : '\n- The family ate these recently, so do not suggest them: ${r.recentMeals.join(', ')}.';
   return '''
 You are a friendly home-cooking helper for a family in an Asian household.
 Suggest 5 home-style dishes for ${r.meal.toLowerCase()}.
 - The meal should be ${r.weight.toLowerCase()}.
 - The staple should be $base.
-- Ingredients at home: $have.
+- Ingredients at home: $have.$recent
 Use mostly the ingredients at home. Only add common pantry items such as oil, salt, water and basic spices.
 For each dish give: name, why (one short friendly sentence on why it fits), and mainIngredients (the 3 to 6 main items used).
 Keep dish names simple and familiar.''';

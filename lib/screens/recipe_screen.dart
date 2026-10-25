@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 
 import '../models/dish.dart';
+import '../services/data_service.dart';
 import '../services/gemini_service.dart';
+import 'log_dish_screen.dart';
 import '../theme.dart';
 
 /// Full recipe for one dish. Implements prd.md > Dish suggestion (full recipe with the making process).
@@ -11,11 +13,15 @@ class RecipeScreen extends StatefulWidget {
     required this.dish,
     required this.request,
     required this.gemini,
+    this.data,
   });
 
   final Dish dish;
   final SuggestRequest request;
   final GeminiService gemini;
+
+  /// When set, the page offers "I cooked this" so the dish can be logged.
+  final DataService? data;
 
   @override
   State<RecipeScreen> createState() => _RecipeScreenState();
@@ -23,6 +29,20 @@ class RecipeScreen extends StatefulWidget {
 
 class _RecipeScreenState extends State<RecipeScreen> {
   late Future<Recipe> _recipe = _load();
+
+  void _logCooked() {
+    final data = widget.data;
+    if (data == null) return;
+    Navigator.of(context).push(MaterialPageRoute(
+      builder: (_) => LogDishScreen(
+        stock: data.inventoryOnce(),
+        onSave: data.logMeal,
+        dishName: widget.dish.name,
+        dishIngredients: widget.dish.mainIngredients,
+        slot: widget.request.meal,
+      ),
+    ));
+  }
 
   /// Dishes from the recipe book already carry their recipe; only Gemini ideas need a request.
   Future<Recipe> _load() => widget.dish.recipe != null
@@ -125,6 +145,14 @@ class _RecipeScreenState extends State<RecipeScreen> {
                       ],
                     ),
                   ),
+                if (widget.data != null) ...[
+                  const SizedBox(height: 12),
+                  FilledButton.icon(
+                    onPressed: _logCooked,
+                    icon: const Icon(Icons.check_circle_outline_rounded),
+                    label: const Text('I cooked this'),
+                  ),
+                ],
               ],
             );
           },

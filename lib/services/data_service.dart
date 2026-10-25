@@ -3,7 +3,9 @@ import 'dart:convert';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 import '../logic/days_left.dart';
+import '../logic/stock_usage.dart';
 import '../models/inventory_item.dart';
+import '../models/meal.dart';
 
 /// When mum last shopped and when she shops next.
 class ShoppingDates {
@@ -23,6 +25,7 @@ class DataService {
 
   DocumentReference<Map<String, dynamic>> get _user => _db.collection('users').doc(uid);
   CollectionReference<Map<String, dynamic>> get _inventory => _user.collection('inventory');
+  CollectionReference<Map<String, dynamic>> get _meals => _user.collection('meals');
 
   /// Her groceries, A to Z. Updates by itself whenever anything changes.
   Stream<List<InventoryItem>> inventory() => _inventory.snapshots().map(_toItems);
@@ -46,6 +49,58 @@ class DataService {
     final items = snapshot.docs.map(InventoryItem.fromDoc).where((i) => i.amount > 0).toList();
     items.sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
     return items;
+  }
+
+  /// The daily log, newest first.
+  Stream<List<MealEntry>> meals() => _meals.snapshots().map(_toMeals);
+
+  List<MealEntry> _toMeals(QuerySnapshot<Map<String, dynamic>> snapshot) {
+    final meals = snapshot.docs.map(MealEntry.fromDoc).toList();
+    meals.sort((a, b) {
+      final byDay = b.date.compareTo(a.date);
+      if (byDay != 0) return byDay;
+      return (b.createdAt ?? DateTime.now()).compareTo(a.createdAt ?? DateTime.now());
+    });
+    return meals;
+  }
+
+  /// Names of dishes cooked in the last [days] days, so they are not suggested again.
+  Future<Set<String>> recentMealNames({int days = 7}) async {
+    final now = DateTime.now();
+    final since = dateToKey(DateTime(now.year, now.month, now.day - (days - 1)));
+    final query = _meals.where('date', isGreaterThanOrEqualTo: since);
+    QuerySnapshot<Map<String, dynamic>> snapshot;
+    try {
+      snapshot = await query
+          .get(const GetOptions(source: Source.server))
+          .timeout(const Duration(seconds: 5));
+    } catch (_) {
+      snapshot = await query.get(const GetOptions(source: Source.cache));
+    }
+    return {for (final m in _toMeals(snapshot)) m.dishName};
+  }
+
+  /// Saves the dish in the log and takes what was used out of the groceries, in one go:
+  /// either both happen or neither does.
+  Future<void> logMeal(LogMealRequest request) {
+    final now = DateTime.now();
+    final batch = _db.batch();
+    batch.set(_meals.doc(), {
+      'dishName': request.dishName.trim(),
+      'slot': request.slot,
+      'date': dateToKey(DateTime(now.year, now.month, now.day)),
+      'used': [for (final u in request.used.where((u) => u.amount > 0)) u.toMap()],
+      'createdAt': FieldValue.serverTimestamp(),
+    });
+    remainingAfter(request.used).forEach((id, amount) {
+      final ref = _inventory.doc(id);
+      if (isFinished(amount)) {
+        batch.delete(ref);
+      } else {
+        batch.set(ref, {'amount': amount}, SetOptions(merge: true));
+      }
+    });
+    return batch.commit();
   }
 
   Stream<ShoppingDates> shoppingDates() => _user.snapshots().map((doc) {

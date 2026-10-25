@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../models/dish.dart';
 import '../models/inventory_item.dart';
+import '../services/data_service.dart';
 import '../services/dish_database.dart';
 import '../services/gemini_service.dart';
 import '../theme.dart';
@@ -21,6 +22,8 @@ class DishSuggestionScreen extends StatefulWidget {
     this.gemini,
     this.database,
     this.stock,
+    this.recentMeals,
+    this.data,
   });
 
   final GeminiService? gemini;
@@ -28,6 +31,12 @@ class DishSuggestionScreen extends StatefulWidget {
 
   /// Her groceries. When there are some, the screen uses them instead of asking what she has.
   final Future<List<InventoryItem>>? stock;
+
+  /// Dishes cooked in the last week; they are not suggested again.
+  final Future<Set<String>>? recentMeals;
+
+  /// Lets the recipe page log a cooked dish. Also supplies [stock] and [recentMeals] when not given.
+  final DataService? data;
 
   @override
   State<DishSuggestionScreen> createState() => _DishSuggestionScreenState();
@@ -48,30 +57,39 @@ class _DishSuggestionScreenState extends State<DishSuggestionScreen> {
   final Set<String> _shown = {};
 
   List<InventoryItem> _stock = const [];
+  Set<String> _recent = const {};
   bool _stockLoaded = false;
 
   @override
   void initState() {
     super.initState();
-    final loading = widget.stock;
-    if (loading == null) {
+    _load();
+  }
+
+  /// Reads her groceries and last week's meals. Either one failing, or taking too long,
+  /// just means it is left out: she can always still type what she has.
+  Future<void> _load() async {
+    final stockLoading = widget.stock ?? widget.data?.inventoryOnce();
+    final recentLoading = widget.recentMeals ?? widget.data?.recentMealNames();
+    if (stockLoading == null && recentLoading == null) {
       _stockLoaded = true;
       return;
     }
-    // Never leave her stuck: if the groceries do not arrive in time, ask what she has instead.
-    loading
-        .timeout(const Duration(seconds: 8))
-        .then((items) {
-          if (!mounted) return;
-          setState(() {
-            _stock = items;
-            _stockLoaded = true;
-          });
-        })
-        .catchError((_) {
-          // If her groceries cannot be read, fall back to asking what she has.
-          if (mounted) setState(() => _stockLoaded = true);
-        });
+    Future<T> safely<T>(Future<T>? loading, T fallback) {
+      if (loading == null) return Future.value(fallback);
+      return loading
+          .timeout(const Duration(seconds: 8))
+          .then<T>((value) => value, onError: (_) => fallback);
+    }
+
+    final stock = await safely<List<InventoryItem>>(stockLoading, const []);
+    final recent = await safely<Set<String>>(recentLoading, const {});
+    if (!mounted) return;
+    setState(() {
+      _stock = stock;
+      _recent = recent;
+      _stockLoaded = true;
+    });
   }
 
   @override
@@ -102,6 +120,7 @@ class _DishSuggestionScreenState extends State<DishSuggestionScreen> {
                 '${i.name} ${formatAmount(i.amount)} ${i.unit}',
             ]
           : const [],
+      recentMeals: _recent.toList(),
     );
     if (!more) _shown.clear();
     setState(() {
@@ -110,7 +129,7 @@ class _DishSuggestionScreenState extends State<DishSuggestionScreen> {
     });
     try {
       final book = widget.database ?? await DishDatabase.load();
-      var dishes = book.suggest(request, exclude: _shown);
+      var dishes = book.suggest(request, exclude: {..._shown, ..._recent});
       if (dishes.isEmpty) dishes = await _gemini.suggestDishes(request);
       _shown.addAll(dishes.map((d) => d.name));
       if (!mounted) return;
@@ -147,6 +166,7 @@ class _DishSuggestionScreenState extends State<DishSuggestionScreen> {
                 dishes: _dishes!,
                 request: _request!,
                 gemini: _gemini,
+                data: widget.data,
                 onRefresh: () => _ask(more: true),
               )
             : _Questions(
@@ -379,12 +399,14 @@ class _Results extends StatelessWidget {
     required this.dishes,
     required this.request,
     required this.gemini,
+    required this.data,
     required this.onRefresh,
   });
 
   final List<Dish> dishes;
   final SuggestRequest request;
   final GeminiService gemini;
+  final DataService? data;
   final VoidCallback onRefresh;
 
   @override
@@ -420,6 +442,7 @@ class _Results extends StatelessWidget {
                     dish: dish,
                     request: request,
                     gemini: gemini,
+                    data: data,
                   ),
                 ),
               ),

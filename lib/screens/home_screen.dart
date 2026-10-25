@@ -6,7 +6,9 @@ import '../models/inventory_item.dart';
 import '../services/data_service.dart';
 import '../theme.dart';
 import 'add_groceries_screen.dart';
+import 'daily_log_screen.dart';
 import 'dish_suggestion_screen.dart';
+import 'log_dish_screen.dart';
 
 /// Home hub: days until the next shopping, what is left, and the way to every other screen.
 /// Implements prd.md > Screens and Layout (Home dashboard).
@@ -26,6 +28,18 @@ class _HomeScreenState extends State<HomeScreen> {
   late final DataService _data = DataService(widget.user.uid);
   late final Stream<List<InventoryItem>> _inventory = _data.inventory();
   late final Stream<ShoppingDates> _dates = _data.shoppingDates();
+
+  void _openLogDish() => Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => LogDishScreen(stock: _data.inventoryOnce(), onSave: _data.logMeal),
+        ),
+      );
+
+  void _openDailyLog() => Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => DailyLogScreen(meals: _data.meals(), onLogDish: _openLogDish),
+        ),
+      );
 
   void _openAddGroceries() => Navigator.of(context).push(
         MaterialPageRoute(builder: (_) => AddGroceriesScreen(data: _data)),
@@ -134,7 +148,7 @@ class _HomeScreenState extends State<HomeScreen> {
               const SizedBox(height: 24),
               _CookPanel(
                 onTap: () => Navigator.of(context).push(
-                  MaterialPageRoute(builder: (_) => DishSuggestionScreen(stock: _data.inventoryOnce())),
+                  MaterialPageRoute(builder: (_) => DishSuggestionScreen(data: _data)),
                 ),
               ),
               const SizedBox(height: 28),
@@ -156,7 +170,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       icon: Icons.menu_book_rounded,
                       title: 'Daily log',
                       subtitle: 'What you cooked and used',
-                      onTap: () => _soon(context, 'Daily log'),
+                      onTap: _openDailyLog,
                     ),
                     const Divider(height: 1, indent: 72, color: lineTan),
                     _MoreRow(

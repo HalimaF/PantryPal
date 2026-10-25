@@ -33,6 +33,7 @@ class SuggestRequest {
     required this.base,
     required this.ingredients,
     this.stockDetails = const [],
+    this.recentMeals = const [],
   });
 
   final String meal; // Lunch or Dinner
@@ -42,4 +43,7 @@ class SuggestRequest {
 
   /// The same items with amounts ("Chicken 1.5 kg"), so Gemini can see how much is left.
   final List<String> stockDetails;
+
+  /// Dishes the family ate in the last week; they are not suggested again.
+  final List<String> recentMeals;
 }

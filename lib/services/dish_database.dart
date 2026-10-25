@@ -122,10 +122,11 @@ class DishDatabase {
   /// main ingredients to be available. [exclude] holds names already shown.
   List<Dish> suggest(SuggestRequest request, {Set<String> exclude = const {}, int limit = 5}) {
     final have = typedIngredients(request.ingredients);
+    final skip = {for (final name in exclude) name.trim().toLowerCase()};
     final scored = <({DishRecord record, double coverage, int matched, bool exactWeight})>[];
 
     for (final d in records) {
-      if (exclude.contains(d.name)) continue;
+      if (skip.contains(d.name.toLowerCase())) continue;
       if (!_mealFits(d) || !_weightFits(request.weight, d) || !_baseFits(request.base, d)) continue;
       final core = d.coreIngredients;
       if (core.isEmpty) continue;

@@ -91,6 +91,34 @@ void main() {
     expect(prompt, contains('Rice 5 kg'));
   });
 
+  testWidgets('a dish eaten recently is not suggested again', (tester) async {
+    String? prompt;
+    final gemini = GeminiService(generate: (p, _) async {
+      prompt = p;
+      return '{"dishes":[{"name":"Chicken Karahi","why":"New.","mainIngredients":["chicken"]}]}';
+    });
+    tester.view.physicalSize = const Size(900, 2400);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    await tester.pumpWidget(MaterialApp(
+      theme: buildTheme(useWebFonts: false),
+      home: DishSuggestionScreen(
+        stock: Future.value(_stock),
+        recentMeals: Future.value({'chicken pulao'}), // the only dish in the recipe book
+        database: DishDatabase(parseDishCsv(_csv)),
+        gemini: gemini,
+      ),
+    ));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Show me dishes'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Chicken Pulao'), findsNothing);
+    expect(find.text('Chicken Karahi'), findsOneWidget);
+    expect(prompt, contains('chicken pulao'));
+  });
+
   testWidgets('if groceries cannot be read it falls back to asking', (tester) async {
     await _open(tester, stock: Future<List<InventoryItem>>(() => throw Exception('offline')));
 

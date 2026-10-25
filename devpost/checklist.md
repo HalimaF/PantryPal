@@ -59,7 +59,7 @@ Build mode: learn
   Learner check: With groceries saved, ask for a suggestion and confirm you are not asked what you have, and that dishes use your saved items.
   Commit: `Use saved groceries for dish suggestions`
 
-- [ ] **5. Log today's dish: stock goes down and dishes stop repeating**
+- [x] **5. Log today's dish: stock goes down and dishes stop repeating**
   Becomes usable: After cooking, tap Log today's dish, pick the dish and confirm how much of each ingredient was used; stock decreases, the Daily log lists the meal, and tomorrow's suggestions avoid recent dishes.
   Why now: Completes the loop in the scope (suggest, cook, log, suggest again) and delivers the "don't repeat dishes" half of the kernel.
   PRD ref: `prd.md > Features and Behavior > Log today's dish`, `prd.md > Features and Behavior > Daily log`
