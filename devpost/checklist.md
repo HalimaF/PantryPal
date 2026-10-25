@@ -79,7 +79,7 @@ Build mode: learn
   Learner check: Set "less spicy, likes desi food, kids like junk food" and check the dishes lean that way.
   Commit: `Add family profile and use it in suggestions`
 
-- [ ] **7. Add groceries by photo**
+- [x] **7. Add groceries by photo**
   Becomes usable: In Add groceries, choose By picture, take or pick a photo, see the item name Gemini finds, correct it if needed, enter quantity and weight, and save.
   Why now: It is the biggest risk after the text path works; the text option is the safety net if the photo path has trouble.
   PRD ref: `prd.md > Features and Behavior > Add groceries`, `prd.md > States and Boundaries` (photo can't be recognised)
@@ -132,3 +132,5 @@ Activity mode: not started
 - Added slice 2b so suggestions come from the learner's own dish database first, with Gemini as backup — the learner found Gemini too slow and chose to write the database themselves (1,003 Pakistani dishes). This reverses `spec.md`'s "AI-written dishes on demand"; the recipe-saving idea is dropped.
 - Added a variety rule to the recipe-book matcher (at most two dishes with identical main ingredients per result) — the first real preview returned five biryani variants for one request.
 - Suggestions now read the groceries once with a direct read instead of re-listening to Home's live feed, and fall back to the text box after 8 seconds — a second listener on an already-open Firestore feed never receives the current list, which left the screen waiting forever.
+- Photos now also read the quantity and keep the brand, and fill in the amount and unit — the learner photographed 1 litre of milk and wanted "Shan Chaat Masala" saved with its brand and one pack counted as 1 pack, while the first version only returned a plain name. `spec.md > Components > Gemini service` `identifyItem` now returns name, amount and unit.
+- A photo can now contain several items: Gemini returns a list, and the Add groceries page shows each one to tick, correct and add together — the learner photographed more than one item and only one was recognised. `identifyItem` became `identifyItems` in `spec.md > Components > Gemini service`.

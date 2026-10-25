@@ -18,11 +18,15 @@ class ShoppingDates {
 /// Everything saved for one signed-in person. The rules in firestore.rules let a person
 /// reach only their own `users/{uid}`. Implements spec.md > Data Model.
 class DataService {
-  DataService(this.uid, {FirebaseFirestore? firestore})
-      : _db = firestore ?? FirebaseFirestore.instance;
+  // A private name cannot be a named parameter, so the field is set by hand.
+  // ignore: prefer_initializing_formals
+  DataService(this.uid, {FirebaseFirestore? firestore}) : _firestore = firestore;
 
   final String uid;
-  final FirebaseFirestore _db;
+  final FirebaseFirestore? _firestore;
+
+  // Looked up when first needed, so a test can replace this class without Firebase running.
+  FirebaseFirestore get _db => _firestore ?? FirebaseFirestore.instance;
 
   DocumentReference<Map<String, dynamic>> get _user => _db.collection('users').doc(uid);
   CollectionReference<Map<String, dynamic>> get _inventory => _user.collection('inventory');

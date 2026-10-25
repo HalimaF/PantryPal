@@ -1,10 +1,12 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:typed_data';
 
 import 'package:firebase_ai/firebase_ai.dart';
 import 'package:flutter/foundation.dart' show debugPrint;
 
 import '../models/dish.dart';
+import '../models/inventory_item.dart';
 
 /// Models are kept in one place so they are easy to swap (spec.md > Stack).
 /// The first is tried first; the next one is used when it is busy or unavailable.
@@ -21,11 +23,34 @@ class GeminiException implements Exception {
 /// Sends a prompt and a JSON schema, returns the raw JSON text. Replaceable in tests.
 typedef Generate = Future<String> Function(String prompt, Schema schema);
 
+/// Like [Generate], with a photo. Replaceable in tests.
+typedef GenerateImage = Future<String> Function(
+  String prompt,
+  Schema schema,
+  Uint8List image,
+  String mimeType,
+);
+
+/// Models that read photos, tried in this order. The Lite model is listed on Google's pricing
+/// page with image input; the other is the backup (spec.md > Stack).
+const geminiImageModels = ['gemini-3.5-flash-lite', 'gemini-3.8-flash'];
+
 /// All AI calls live here. Implements spec.md > Components > Gemini service.
 class GeminiService {
-  GeminiService({Generate? generate}) : _generate = generate ?? _generateWithFirebase;
+  GeminiService({Generate? generate, GenerateImage? generateImage})
+      : _generate = generate ?? _generateWithFirebase,
+        _generateImage = generateImage ?? _generateImageWithFirebase;
 
   final Generate _generate;
+  final GenerateImage _generateImage;
+
+  /// Every grocery item in a photo: its name (with the brand if visible) and how much the
+  /// packaging shows. Empty when it cannot tell what anything is.
+  /// Implements prd.md > Features and Behavior > Add groceries (photo).
+  Future<List<IdentifiedItem>> identifyItems(Uint8List photo, String mimeType) async {
+    final text = await _generateImage(buildIdentifyPrompt(), _identifySchema, photo, mimeType);
+    return parseIdentifiedItems(text);
+  }
 
   Future<List<Dish>> suggestDishes(SuggestRequest request) async {
     final text = await _generate(buildSuggestPrompt(request), _dishesSchema);
@@ -48,6 +73,19 @@ final _dishesSchema = Schema.object(properties: {
   ),
 });
 
+final _identifySchema = Schema.object(properties: {
+  'items': Schema.array(
+    items: Schema.object(
+      properties: {
+        'name': Schema.string(),
+        'amount': Schema.number(nullable: true),
+        'unit': Schema.string(nullable: true),
+      },
+      optionalProperties: ['amount', 'unit'],
+    ),
+  ),
+});
+
 final _recipeSchema = Schema.object(properties: {
   'ingredients': Schema.array(items: Schema.string()),
   'steps': Schema.array(items: Schema.string()),
@@ -64,6 +102,29 @@ Future<String> _generateWithFirebase(String prompt, Schema schema) {
     );
     final response =
         await model.generateContent([Content.text(prompt)]).timeout(const Duration(seconds: 60));
+    final text = response.text;
+    if (text == null || text.trim().isEmpty) throw StateError('empty answer');
+    return text;
+  });
+}
+
+Future<String> _generateImageWithFirebase(
+  String prompt,
+  Schema schema,
+  Uint8List image,
+  String mimeType,
+) {
+  return generateWithFallback(geminiImageModels, (modelName) async {
+    final model = FirebaseAI.googleAI().generativeModel(
+      model: modelName,
+      generationConfig: GenerationConfig(
+        responseMimeType: 'application/json',
+        responseSchema: schema,
+      ),
+    );
+    final response = await model.generateContent([
+      Content.multi([TextPart(prompt), InlineDataPart(mimeType, image)]),
+    ]).timeout(const Duration(seconds: 45));
     final text = response.text;
     if (text == null || text.trim().isEmpty) throw StateError('empty answer');
     return text;
@@ -104,6 +165,19 @@ Future<String> generateWithFallback(
       : 'The cooking helper could not answer. Please try again.');
 }
 
+String buildIdentifyPrompt() => '''
+This is a photo of groceries bought for a home kitchen, likely in an Asian household.
+List every different grocery item you can see, up to 12. If the same item appears several times, list it once.
+For each item give:
+- name: what it is, in simple everyday English. If a brand is visible on the packaging, put the brand first and keep it as printed, for example "Shan Chaat Masala", "National Chaat Masala", "Olpers Milk". With no brand, use a plain name such as chicken, basmati rice, onions.
+- amount and unit: how much there is.
+  * If the packaging shows a quantity for something sold by volume or weight (milk, oil, flour, rice, sugar), use it, for example 1 L, 500 ml, 2 kg, 500 g.
+  * Spices, masalas, tea and small packets count as packs: amount 1, unit "packs" (or the number of packs you can see).
+  * If you can count identical items (eggs, bananas, tomatoes), use the count with unit "pieces".
+  * If you cannot tell how much, leave amount and unit empty.
+Allowed units: kg, g, L, ml, pieces, packs.
+If you cannot tell what anything is, return an empty list.''';
+
 String buildSuggestPrompt(SuggestRequest r) {
   final items = r.stockDetails.isNotEmpty ? r.stockDetails : r.ingredients;
   final have = items.isEmpty ? 'not specified' : items.join(', ');
@@ -130,6 +204,52 @@ String buildRecipePrompt(String dishName, List<String> ingredients) {
 Write a clear home recipe for "$dishName" for a family of about four.
 Ingredients at home: $have. Use them where they fit.
 Give ingredients (each with a simple quantity) and steps (short, numbered in order, written for a home cook).''';
+}
+
+/// Other ways Gemini might write a unit, matched to the ones the app uses.
+const _unitNames = {
+  'kg': 'kg', 'kgs': 'kg', 'kilo': 'kg', 'kilos': 'kg', 'kilogram': 'kg', 'kilograms': 'kg',
+  'g': 'g', 'gm': 'g', 'gms': 'g', 'gram': 'g', 'grams': 'g',
+  'l': 'L', 'lt': 'L', 'ltr': 'L', 'liter': 'L', 'liters': 'L', 'litre': 'L', 'litres': 'L',
+  'ml': 'ml', 'milliliter': 'ml', 'milliliters': 'ml', 'millilitre': 'ml', 'millilitres': 'ml',
+  'piece': 'pieces', 'pieces': 'pieces', 'pcs': 'pieces', 'pc': 'pieces', 'count': 'pieces',
+  'pack': 'packs', 'packs': 'packs', 'packet': 'packs', 'packets': 'packs', 'box': 'packs',
+};
+
+/// The unit in the app's own spelling, or null when it is not one we know.
+String? normalizeUnit(String? raw) => _unitNames[(raw ?? '').trim().toLowerCase()];
+
+/// Every item Gemini saw, tidied up. Items it could not name are dropped, and an amount is only
+/// kept when it comes with a unit we know and makes sense.
+List<IdentifiedItem> parseIdentifiedItems(String text) {
+  try {
+    final data = jsonDecode(text) as Map<String, dynamic>;
+    final found = <IdentifiedItem>[];
+    final seen = <String>{};
+    for (final raw in data['items'] as List) {
+      if (raw is! Map) continue;
+      var name = (raw['name'] as String? ?? '').replaceAll('"', '').trim();
+      if (name.length > 40) name = name.substring(0, 40).trim();
+      const unknown = {'', 'unknown', 'n/a', 'none', 'unclear', 'unidentified', 'not sure'};
+      if (unknown.contains(name.toLowerCase())) continue;
+
+      final rawAmount = raw['amount'];
+      final unit = normalizeUnit(raw['unit'] as String?);
+      final amount = rawAmount is num ? rawAmount.toDouble() : null;
+      final usable = amount != null && amount > 0 && amount <= 10000 && unit != null;
+      // The same item twice is listed once.
+      if (!seen.add('${name.toLowerCase()}|${usable ? unit : ''}')) continue;
+      found.add(IdentifiedItem(
+        name: name,
+        amount: usable ? amount : null,
+        unit: usable ? unit : null,
+      ));
+      if (found.length == 12) break;
+    }
+    return found;
+  } on Object {
+    throw GeminiException('We could not read the photo. Please type what it is.');
+  }
 }
 
 List<Dish> parseDishes(String text) {
