@@ -1,5 +1,5 @@
 import 'package:firebase_core/firebase_core.dart';
-import 'package:flutter/material.dart' show FilledButton;
+import 'package:flutter/material.dart' show FilledButton, Icons, TextField;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:patrol/patrol.dart';
 import 'package:what_can_i_cook/firebase_options.dart';
@@ -29,5 +29,35 @@ void main() {
 
     await $(FilledButton).tap();
     expect($('Please enter your email and password.'), findsOneWidget);
+  });
+
+  patrolTest('signing up needs a name first', ($) async {
+    await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+    await $.pumpWidgetAndSettle(const WhatCanICookApp());
+
+    await $('Sign up').tap();
+    await $('Create my account').tap();
+    expect($('Please tell us your name.'), findsOneWidget);
+  });
+
+  patrolTest('with a name typed, signing up still needs an email and password', ($) async {
+    await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+    await $.pumpWidgetAndSettle(const WhatCanICookApp());
+
+    await $('Sign up').tap();
+    await $(TextField).at(0).enterText('Halima'); // the first box is the name
+    await $('Create my account').tap();
+    expect($('Please enter your email and password.'), findsOneWidget);
+  });
+
+  patrolTest('the eye icon shows and hides the password', ($) async {
+    await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+    await $.pumpWidgetAndSettle(const WhatCanICookApp());
+
+    expect($(Icons.visibility_outlined), findsOneWidget);
+    await $(Icons.visibility_outlined).tap();
+    expect($(Icons.visibility_off_outlined), findsOneWidget);
+    await $(Icons.visibility_off_outlined).tap();
+    expect($(Icons.visibility_outlined), findsOneWidget);
   });
 }

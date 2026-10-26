@@ -84,7 +84,9 @@ class _RecipeScreenState extends State<RecipeScreen> {
                       Text(message, textAlign: TextAlign.center, style: text.bodyLarge),
                       const SizedBox(height: 20),
                       FilledButton.icon(
-                        onPressed: () => setState(() => _recipe = _load()),
+                        onPressed: () => setState(() {
+                          _recipe = _load(); // a block, so setState is not handed a Future
+                        }),
                         icon: const Icon(Icons.refresh_rounded),
                         label: const Text('Try again'),
                       ),

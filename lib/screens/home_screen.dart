@@ -14,9 +14,12 @@ import 'profile_screen.dart';
 /// Home hub: days until the next shopping, what is left, and the way to every other screen.
 /// Implements prd.md > Screens and Layout (Home dashboard).
 class HomeScreen extends StatefulWidget {
-  const HomeScreen({super.key, required this.user});
+  const HomeScreen({super.key, required this.user, this.data});
 
   final User user;
+
+  /// Her saved data. Left out in the app, which makes its own; handed in by tests.
+  final DataService? data;
 
   @override
   State<HomeScreen> createState() => _HomeScreenState();
@@ -26,7 +29,7 @@ class _HomeScreenState extends State<HomeScreen> {
   User get user => widget.user;
 
   // Made once, so the lists below are not reloaded every time the screen redraws.
-  late final DataService _data = DataService(widget.user.uid);
+  late final DataService _data = widget.data ?? DataService(widget.user.uid);
   late final Stream<List<InventoryItem>> _inventory = _data.inventory();
   late final Stream<ShoppingDates> _dates = _data.shoppingDates();
 
