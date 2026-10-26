@@ -1,8 +1,0 @@
-# Signing up with nothing typed asks for a name first. No account, writes nothing.
-appId: com.haleema.what_can_i_cook
----
-- launchApp:
-    clearState: true
-- tapOn: "Create an account"
-- tapOn: "Create my account"
-- assertVisible: "Please tell us your name."

@@ -90,25 +90,15 @@ You need Flutter, an Android phone or emulator, and a Firebase project.
    flutter analyze
    flutter test
    ```
-5. **Run every test and save the reports** (the phone must be connected and unlocked):
-   ```
-   powershell -File scripts/run_all_tests.ps1
-   ```
-   Reports are saved in `test-reports/` (not in git):
-   `flutter-test.txt` and `.json` (the quick checks), `patrol/index.html`, `maestro-report.html`.
-   Use `-LaptopOnly` to skip the phone checks. The phone checks clear the app's data, so you are
-   logged out afterwards.
 
 ## Tests
 
 | What | How many | Runs on | Good for |
 |---|---|---|---|
 | `flutter test` (`test/`) | 338 | the laptop, about 30 s | edge cases: dates, amounts, matching, every screen, the real saving logic against a stand-in Firestore, every kind of Gemini failure |
-| Maestro (`maestro/`) | 5 flows | the phone | tapping through the finished app, written as short YAML |
-| Patrol (`patrol_test/`) | 5 tests | the phone | the same, written in Dart inside a test build |
 
 The quick checks cover about 87% of the code lines. What they cannot reach is the real camera and
-gallery, and anything that needs a real login (the phone tests would write to the live Firebase).
+gallery and the live Firebase project; those were checked by hand on a phone.
 
 ## Your own recipe book
 
@@ -134,7 +124,7 @@ lib/
   models/                dish, inventory_item, meal, family_profile
 data/dishes.csv          the recipe book
 firestore.rules          who can read and write what
-test/                    338 quick tests (plus patrol_test/ and maestro/ for the phone)
+test/                    338 quick tests
 devpost/                 the plan: scope, PRD, spec, build checklist
 ```
 

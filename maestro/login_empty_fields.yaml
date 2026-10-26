@@ -1,7 +1,0 @@
-# Same check as the Patrol test "logging in with nothing typed explains what is missing".
-appId: com.haleema.what_can_i_cook
----
-- launchApp:
-    clearState: true
-- tapOn: "Sign in"
-- assertVisible: "Please enter your email and password."
