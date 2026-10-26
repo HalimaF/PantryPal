@@ -2,12 +2,14 @@ import 'package:fake_cloud_firestore/fake_cloud_firestore.dart';
 import 'package:firebase_auth_mocks/firebase_auth_mocks.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:what_can_i_cook/screens/app_shell.dart';
 import 'package:what_can_i_cook/services/data_service.dart';
 
 import 'helpers/test_app.dart';
 
 Future<void> _open(WidgetTester tester) async {
+  SharedPreferences.setMockInitialValues({});
   tester.view.physicalSize = const Size(900, 3200);
   tester.view.devicePixelRatio = 1;
   addTearDown(tester.view.reset);
@@ -38,7 +40,7 @@ void main() {
 
     await tester.tap(find.text('Cook'));
     await tester.pumpAndSettle();
-    expect(find.text('Tell me about today'), findsOneWidget);
+    expect(find.text('What to cook'), findsOneWidget);
 
     await tester.tap(find.text('Home'));
     await tester.pumpAndSettle();
@@ -49,7 +51,7 @@ void main() {
     await _open(tester);
     await tester.tap(find.text('Suggest a dish'));
     await tester.pumpAndSettle();
-    expect(find.text('Tell me about today'), findsOneWidget);
+    expect(find.text('What to cook'), findsOneWidget);
   });
 
   testWidgets('Add groceries on an empty Home switches to the Groceries tab', (tester) async {

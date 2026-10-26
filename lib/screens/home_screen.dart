@@ -171,7 +171,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   ],
                 ),
                 const SizedBox(height: Space.l),
-                _Hero(onTap: () => _openTab(2, DishSuggestionScreen(data: _data))),
+                _Hero(onTap: () => _openTab(2, Scaffold(body: DishSuggestionScreen(data: _data)))),
                 const SizedBox(height: Space.l),
                 _KitchenStock(
                   inventory: _inventory,

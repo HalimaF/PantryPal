@@ -6,7 +6,16 @@ import '../models/inventory_item.dart';
 import '../services/data_service.dart';
 import '../services/dish_database.dart';
 import '../services/gemini_service.dart';
-import '../theme.dart';
+import '../services/ingredient_matcher.dart';
+import '../state/cook_choices.dart';
+import '../ui/app_button.dart';
+import '../ui/app_card.dart';
+import '../ui/context_ext.dart';
+import '../ui/segmented_choice.dart';
+import '../ui/skeleton.dart';
+import '../ui/states.dart';
+import '../ui/status_chip.dart';
+import '../ui/tokens.dart';
 import 'recipe_screen.dart';
 
 /// Splits "chicken, onion\nrice" into items; also accepts the Urdu comma.
@@ -16,7 +25,8 @@ List<String> splitIngredients(String raw) => raw
     .where((s) => s.isNotEmpty)
     .toList();
 
-/// Questions, then dishes. Implements prd.md > Features and Behavior > Dish suggestion.
+/// Cook tab: three filters that remember her last picks, and the dishes right under them.
+/// Best match first, from her own recipe book. Implements prd.md > Features and Behavior > Dish suggestion.
 class DishSuggestionScreen extends StatefulWidget {
   const DishSuggestionScreen({
     super.key,
@@ -51,9 +61,7 @@ class _DishSuggestionScreenState extends State<DishSuggestionScreen> {
   late final GeminiService _gemini = widget.gemini ?? GeminiService();
   final _ingredients = TextEditingController();
 
-  String _meal = 'Dinner';
-  String _weight = 'Light';
-  String _base = 'Rice';
+  CookChoices _choices = const CookChoices();
 
   bool _loading = false;
   String? _error;
@@ -72,16 +80,13 @@ class _DishSuggestionScreenState extends State<DishSuggestionScreen> {
     _load();
   }
 
-  /// Reads her groceries and last week's meals. Either one failing, or taking too long,
-  /// just means it is left out: she can always still type what she has.
+  /// Reads her last choices, groceries and last week's meals. Any of them failing, or taking too
+  /// long, just means it is left out: she can always still type what she has.
   Future<void> _load() async {
+    final choicesLoading = CookChoices.load();
     final stockLoading = widget.stock ?? widget.data?.inventoryOnce();
     final recentLoading = widget.recentMeals ?? widget.data?.recentMealNames();
     final profileLoading = widget.profile ?? widget.data?.profileOnce();
-    if (stockLoading == null && recentLoading == null && profileLoading == null) {
-      _stockLoaded = true;
-      return;
-    }
     Future<T> safely<T>(Future<T>? loading, T fallback) {
       if (loading == null) return Future.value(fallback);
       return loading
@@ -89,16 +94,19 @@ class _DishSuggestionScreenState extends State<DishSuggestionScreen> {
           .then<T>((value) => value, onError: (_) => fallback);
     }
 
+    final choices = await choicesLoading;
     final stock = await safely<List<InventoryItem>>(stockLoading, const []);
     final recent = await safely<Set<String>>(recentLoading, const {});
     final profile = await safely<FamilyProfile>(profileLoading, FamilyProfile.empty);
     if (!mounted) return;
     setState(() {
+      _choices = choices;
       _stock = stock;
       _recent = recent;
       _profile = profile;
       _stockLoaded = true;
     });
+    if (stock.isNotEmpty) _ask();
   }
 
   @override
@@ -107,27 +115,28 @@ class _DishSuggestionScreenState extends State<DishSuggestionScreen> {
     super.dispose();
   }
 
+  void _choose(CookChoices next) {
+    setState(() => _choices = next);
+    next.save();
+    if (_stock.isNotEmpty || _dishes != null) _ask();
+  }
+
   /// Your recipe book first (instant); Gemini only when it has nothing that fits.
   /// [more] asks for different dishes than the ones already shown.
   Future<void> _ask({bool more = false}) async {
     final usingStock = _stock.isNotEmpty;
-    final items = usingStock
-        ? [for (final i in _stock) i.name]
-        : splitIngredients(_ingredients.text);
+    final items = usingStock ? [for (final i in _stock) i.name] : splitIngredients(_ingredients.text);
     if (items.isEmpty) {
       setState(() => _error = 'Please type a few things you have at home.');
       return;
     }
     final request = SuggestRequest(
-      meal: _meal,
-      weight: _weight,
-      base: _base,
+      meal: _choices.meal,
+      weight: _choices.weight,
+      base: _choices.base,
       ingredients: items,
       stockDetails: usingStock
-          ? [
-              for (final i in _stock)
-                '${i.name} ${formatAmount(i.amount)} ${i.unit}',
-            ]
+          ? [for (final i in _stock) '${i.name} ${formatAmount(i.amount)} ${i.unit}']
           : const [],
       recentMeals: _recent.toList(),
       profile: _profile,
@@ -154,388 +163,276 @@ class _DishSuggestionScreenState extends State<DishSuggestionScreen> {
     }
   }
 
+  void _openRecipe(Dish dish) => Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => RecipeScreen(dish: dish, request: _request!, gemini: _gemini, data: widget.data),
+        ),
+      );
+
+  Set<String> get _have => typedIngredients(
+        _stock.isNotEmpty ? [for (final i in _stock) i.name] : splitIngredients(_ingredients.text),
+      );
+
   @override
   Widget build(BuildContext context) {
-    final showingResults = _dishes != null && !_loading;
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(showingResults ? 'Dish ideas' : 'What can I cook?'),
-        leading: showingResults
-            ? IconButton(
-                tooltip: 'Change answers',
-                icon: const Icon(Icons.arrow_back_rounded),
-                onPressed: () => setState(() => _dishes = null),
-              )
-            : null,
-      ),
-      body: SafeArea(
-        child: _loading
-            ? const _Thinking()
-            : showingResults
-            ? _Results(
-                dishes: _dishes!,
-                request: _request!,
-                gemini: _gemini,
-                data: widget.data,
-                onRefresh: () => _ask(more: true),
-              )
-            : _Questions(
-                meal: _meal,
-                weight: _weight,
-                base: _base,
-                ingredients: _ingredients,
-                stock: _stock,
-                stockLoaded: _stockLoaded,
-                error: _error,
-                onMeal: (v) => setState(() => _meal = v),
-                onWeight: (v) => setState(() => _weight = v),
-                onBase: (v) => setState(() => _base = v),
-                onAsk: _ask,
+    final text = context.text;
+    final colors = context.colors;
+    return SafeArea(
+      child: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: maxContentWidth),
+          child: ListView(
+            padding: const EdgeInsets.fromLTRB(Space.l, Space.m, Space.l, Space.xl),
+            children: [
+              Text('What to cook', style: text.headlineMedium),
+              const SizedBox(height: Space.xs),
+              Text('Best match first, using what is in your kitchen',
+                  style: text.bodySmall?.copyWith(color: colors.onSurfaceVariant)),
+              const SizedBox(height: Space.m),
+              AppCard(
+                child: Column(
+                  children: [
+                    SegmentedChoice(
+                      label: 'Meal',
+                      options: CookChoices.meals,
+                      selected: _choices.meal,
+                      onSelected: (v) => _choose(_choices.copyWith(meal: v)),
+                    ),
+                    const SizedBox(height: Space.s),
+                    SegmentedChoice(
+                      label: 'Weight',
+                      options: CookChoices.weights,
+                      selected: _choices.weight,
+                      onSelected: (v) => _choose(_choices.copyWith(weight: v)),
+                    ),
+                    const SizedBox(height: Space.s),
+                    SegmentedChoice(
+                      label: 'With',
+                      options: CookChoices.bases,
+                      selected: _choices.base,
+                      onSelected: (v) => _choose(_choices.copyWith(base: v)),
+                    ),
+                  ],
+                ),
               ),
-      ),
-    );
-  }
-}
-
-class _Thinking extends StatelessWidget {
-  const _Thinking();
-
-  @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          const CircularProgressIndicator(),
-          const SizedBox(height: 20),
-          Text(
-            'Thinking of dishes…',
-            style: Theme.of(context).textTheme.titleLarge,
+              const SizedBox(height: Space.s),
+              Row(
+                children: [
+                  Icon(Icons.info_outline_rounded, size: 16, color: colors.onSurfaceVariant),
+                  const SizedBox(width: Space.xs),
+                  Expanded(
+                    child: Text('Dishes cooked in the last 7 days are hidden.',
+                        style: text.bodySmall?.copyWith(color: colors.onSurfaceVariant)),
+                  ),
+                ],
+              ),
+              const SizedBox(height: Space.m),
+              ..._body(context),
+            ],
           ),
-        ],
+        ),
       ),
     );
   }
-}
 
-class _Questions extends StatelessWidget {
-  const _Questions({
-    required this.meal,
-    required this.weight,
-    required this.base,
-    required this.ingredients,
-    required this.stock,
-    required this.stockLoaded,
-    required this.error,
-    required this.onMeal,
-    required this.onWeight,
-    required this.onBase,
-    required this.onAsk,
-  });
+  List<Widget> _body(BuildContext context) {
+    final text = context.text;
+    if (!_stockLoaded) return [SkeletonLoader.list(count: 3, itemHeight: 168)];
 
-  final String meal;
-  final String weight;
-  final String base;
-  final TextEditingController ingredients;
-  final List<InventoryItem> stock;
-  final bool stockLoaded;
-  final String? error;
-  final ValueChanged<String> onMeal;
-  final ValueChanged<String> onWeight;
-  final ValueChanged<String> onBase;
-  final VoidCallback onAsk;
+    final asking = <Widget>[
+      if (_stock.isEmpty) ...[
+        Text('What do you have at home?', style: text.titleMedium),
+        const SizedBox(height: Space.s),
+        TextField(
+          controller: _ingredients,
+          minLines: 3,
+          maxLines: 5,
+          textCapitalization: TextCapitalization.sentences,
+          decoration: const InputDecoration(
+            hintText: 'For example: chicken, onion, rice, yogurt',
+            helperText: 'Separate with commas',
+          ),
+        ),
+        const SizedBox(height: Space.m),
+        AppButton(label: 'Show me dishes', icon: Icons.restaurant_menu_rounded, onPressed: _loading ? null : _ask),
+        const SizedBox(height: Space.m),
+      ],
+    ];
 
-  @override
-  Widget build(BuildContext context) {
-    final text = Theme.of(context).textTheme;
-    return ListView(
-      padding: const EdgeInsets.fromLTRB(20, 8, 20, 32),
-      children: [
-        Text('Tell me about today', style: text.headlineSmall),
-        const SizedBox(height: 20),
-        _Group(
-          label: 'Which meal?',
-          options: const ['Lunch', 'Dinner'],
-          selected: meal,
-          onSelected: onMeal,
-        ),
-        _Group(
-          label: 'How heavy?',
-          options: const ['Light', 'Heavy'],
-          selected: weight,
-          onSelected: onWeight,
-        ),
-        _Group(
-          label: 'What with?',
-          options: const ['Rice', 'Roti', 'Bread', 'Noodles', 'Any'],
-          selected: base,
-          onSelected: onBase,
-        ),
-        if (!stockLoaded)
-          const Padding(
-            padding: EdgeInsets.symmetric(vertical: 12),
-            child: Center(child: CircularProgressIndicator()),
-          )
-        else if (stock.isNotEmpty)
-          _StockCard(items: stock)
-        else ...[
-          Text('What do you have at home?', style: text.titleMedium),
-          const SizedBox(height: 10),
-          TextField(
-            controller: ingredients,
-            minLines: 3,
-            maxLines: 5,
-            textCapitalization: TextCapitalization.sentences,
-            decoration: const InputDecoration(
-              hintText: 'For example: chicken, onion, rice, yogurt',
-              helperText: 'Separate with commas',
+    if (_loading) return [...asking, SkeletonLoader.list(count: 3, itemHeight: 168)];
+    if (_error != null) {
+      if (_stock.isEmpty) {
+        return [
+          ...asking,
+          AppCard(
+            color: context.colors.errorContainer,
+            borderColor: context.colors.errorContainer,
+            child: Row(
+              children: [
+                Icon(Icons.error_outline_rounded, color: context.colors.onErrorContainer),
+                const SizedBox(width: Space.m),
+                Expanded(
+                  child: Text(_error!, style: text.bodyMedium?.copyWith(color: context.colors.onErrorContainer)),
+                ),
+              ],
             ),
           ),
-        ],
-        if (error != null) ...[
-          const SizedBox(height: 14),
-          _ErrorBox(message: error!),
-        ],
-        const SizedBox(height: 24),
-        FilledButton.icon(
-          onPressed: stockLoaded ? onAsk : null,
-          icon: const Icon(Icons.restaurant_menu_rounded),
-          label: const Text('Show me dishes'),
+        ];
+      }
+      return [
+        ErrorState(message: _error!, retryLabel: context.l10n.retry, onRetry: _ask),
+      ];
+    }
+    final dishes = _dishes;
+    if (dishes == null) return asking;
+
+    final have = _have;
+    return [
+      ...asking,
+      for (var i = 0; i < dishes.length; i++) ...[
+        _DishCard(
+          dish: dishes[i],
+          best: i == 0,
+          have: have,
+          onOpen: () => _openRecipe(dishes[i]),
         ),
+        const SizedBox(height: Space.m),
       ],
-    );
+      AppButton(
+        label: 'Show different dishes',
+        icon: Icons.refresh_rounded,
+        kind: AppButtonKind.secondary,
+        onPressed: () => _ask(more: true),
+      ),
+    ];
   }
 }
 
-/// Shown instead of the "what do you have?" box when her groceries are already saved.
-class _StockCard extends StatelessWidget {
-  const _StockCard({required this.items});
-  final List<InventoryItem> items;
+/// One suggestion: where it came from, how much of it she already has, and what to do next.
+class _DishCard extends StatelessWidget {
+  const _DishCard({required this.dish, required this.best, required this.have, required this.onOpen});
+
+  final Dish dish;
+  final bool best;
+  final Set<String> have;
+  final VoidCallback onOpen;
 
   @override
   Widget build(BuildContext context) {
-    final text = Theme.of(context).textTheme;
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: lineTan),
-      ),
+    final text = context.text;
+    final colors = context.colors;
+    final main = dish.mainIngredients;
+    final missing = [
+      for (final m in main)
+        if (!have.contains(canonicalIngredient(m))) m,
+    ];
+    final haveCount = main.length - missing.length;
+    final all = main.isNotEmpty && missing.isEmpty;
+
+    return AppCard(
+      padding: const EdgeInsets.all(Space.m),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Icon(Icons.kitchen_rounded, color: leafGreen),
-              const SizedBox(width: 10),
+              _Thumb(fromBook: dish.fromDatabase),
+              const SizedBox(width: Space.m),
               Expanded(
-                child: Text(
-                  'Using what is in your kitchen',
-                  style: text.titleMedium,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 10),
-          Text(
-            items.map((i) => i.name).join(', '),
-            style: text.bodyLarge?.copyWith(color: mutedBrown, height: 1.4),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _Group extends StatelessWidget {
-  const _Group({
-    required this.label,
-    required this.options,
-    required this.selected,
-    required this.onSelected,
-  });
-
-  final String label;
-  final List<String> options;
-  final String selected;
-  final ValueChanged<String> onSelected;
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 22),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(label, style: Theme.of(context).textTheme.titleMedium),
-          const SizedBox(height: 10),
-          Wrap(
-            spacing: 10,
-            runSpacing: 10,
-            children: [
-              for (final o in options)
-                ChoiceChip(
-                  label: Text(o),
-                  selected: o == selected,
-                  showCheckmark: false,
-                  onSelected: (_) => onSelected(o),
-                  labelStyle: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w700,
-                    color: o == selected ? Colors.white : inkBrown,
-                  ),
-                  selectedColor: terracotta,
-                  backgroundColor: Colors.white,
-                  side: const BorderSide(color: lineTan),
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 10,
-                    vertical: 10,
-                  ),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(14),
-                  ),
-                ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _Results extends StatelessWidget {
-  const _Results({
-    required this.dishes,
-    required this.request,
-    required this.gemini,
-    required this.data,
-    required this.onRefresh,
-  });
-
-  final List<Dish> dishes;
-  final SuggestRequest request;
-  final GeminiService gemini;
-  final DataService? data;
-  final VoidCallback onRefresh;
-
-  @override
-  Widget build(BuildContext context) {
-    final text = Theme.of(context).textTheme;
-    return ListView(
-      padding: const EdgeInsets.fromLTRB(20, 4, 20, 32),
-      children: [
-        Text(
-          '${request.meal}, ${request.weight.toLowerCase()}, with ${request.base.toLowerCase()}',
-          style: text.bodyMedium?.copyWith(color: mutedBrown, fontSize: 16),
-        ),
-        const SizedBox(height: 4),
-        Text(
-          dishes.every((d) => d.fromDatabase)
-              ? 'From your own recipe book'
-              : 'Ideas from the cooking helper',
-          style: text.bodyMedium?.copyWith(
-            color: leafGreen,
-            fontWeight: FontWeight.w700,
-          ),
-        ),
-        const SizedBox(height: 14),
-        for (final dish in dishes) ...[
-          Material(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(20),
-            clipBehavior: Clip.antiAlias,
-            child: InkWell(
-              onTap: () => Navigator.of(context).push(
-                MaterialPageRoute(
-                  builder: (_) => RecipeScreen(
-                    dish: dish,
-                    request: request,
-                    gemini: gemini,
-                    data: data,
-                  ),
-                ),
-              ),
-              child: Container(
-                padding: const EdgeInsets.all(18),
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(20),
-                  border: Border.all(color: lineTan),
-                ),
-                child: Row(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
+                    Text(dish.name, style: text.titleLarge),
+                    const SizedBox(height: Space.xs),
+                    Text(dish.why, style: text.bodySmall?.copyWith(color: colors.onSurfaceVariant)),
+                    if (main.isNotEmpty) ...[
+                      const SizedBox(height: Space.s),
+                      Row(
                         children: [
-                          Text(dish.name, style: text.titleLarge),
-                          const SizedBox(height: 6),
-                          Text(
-                            dish.why,
-                            style: text.bodyMedium?.copyWith(
-                              color: mutedBrown,
-                              fontSize: 16,
-                            ),
+                          Icon(
+                            all ? Icons.check_rounded : Icons.warning_amber_rounded,
+                            size: 16,
+                            color: all ? colors.secondary : context.appColors.warning,
                           ),
-                          const SizedBox(height: 8),
-                          Text(
-                            dish.mainIngredients.join(' · '),
-                            style: text.bodyMedium?.copyWith(
-                              color: terracotta,
-                              fontWeight: FontWeight.w700,
+                          const SizedBox(width: Space.xs),
+                          Expanded(
+                            child: Text(
+                              all ? 'You have all ${main.length}' : 'You have $haveCount of ${main.length}',
+                              style: text.labelMedium?.copyWith(
+                                color: all ? colors.secondary : context.appColors.warning,
+                              ),
                             ),
                           ),
                         ],
                       ),
-                    ),
-                    const Icon(Icons.chevron_right_rounded, color: mutedBrown),
+                      const SizedBox(height: Space.xs),
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(8),
+                        child: LinearProgressIndicator(
+                          value: haveCount / main.length,
+                          minHeight: 8,
+                          color: all ? colors.secondary : context.appColors.warning,
+                        ),
+                      ),
+                      if (missing.isNotEmpty) ...[
+                        const SizedBox(height: Space.s),
+                        StatusChip(
+                          label: 'Missing: ${missing.join(', ')}',
+                          icon: Icons.warning_amber_rounded,
+                          tone: StatusTone.warning,
+                        ),
+                      ],
+                    ],
+                    if (best) ...[
+                      const SizedBox(height: Space.s),
+                      const StatusChip(label: 'Best match', icon: Icons.star_rounded, tone: StatusTone.info),
+                    ],
                   ],
                 ),
               ),
-            ),
+            ],
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: Space.m),
+          Row(
+            children: [
+              Expanded(
+                child: AppButton(label: 'Recipe', kind: AppButtonKind.secondary, onPressed: onOpen),
+              ),
+              const SizedBox(width: Space.s),
+              Expanded(child: AppButton(label: 'Cook this', onPressed: onOpen)),
+            ],
+          ),
         ],
-        const SizedBox(height: 8),
-        OutlinedButton.icon(
-          style: OutlinedButton.styleFrom(
-            minimumSize: const Size.fromHeight(52),
-            foregroundColor: terracotta,
-            side: const BorderSide(color: terracotta),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(16),
-            ),
-          ),
-          onPressed: onRefresh,
-          icon: const Icon(Icons.refresh_rounded),
-          label: const Text('Show different dishes'),
-        ),
-      ],
+      ),
     );
   }
 }
 
-class _ErrorBox extends StatelessWidget {
-  const _ErrorBox({required this.message});
-  final String message;
+/// A soft square with a bowl and a small label saying where the dish came from. Honest: a recipe
+/// from her own book and an AI idea are never made to look the same.
+class _Thumb extends StatelessWidget {
+  const _Thumb({required this.fromBook});
+  final bool fromBook;
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: const Color(0xFFFBE4E1),
-        borderRadius: BorderRadius.circular(14),
-      ),
-      child: Row(
+    final colors = context.colors;
+    return SizedBox(
+      width: 88,
+      child: Column(
         children: [
-          const Icon(Icons.error_outline_rounded, color: Color(0xFFB3261E)),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Text(
-              message,
-              style: const TextStyle(color: Color(0xFF7A1A14), fontSize: 15),
-            ),
+          Container(
+            width: 88,
+            height: 88,
+            decoration: BoxDecoration(color: colors.primaryContainer, borderRadius: Corner.mediumRadius),
+            child: Icon(Icons.rice_bowl_rounded, size: 44, color: colors.onPrimaryContainer),
+          ),
+          const SizedBox(height: Space.xs),
+          StatusChip(
+            label: fromBook ? 'Recipe book' : 'AI suggestion',
+            icon: fromBook ? Icons.menu_book_rounded : Icons.auto_awesome_rounded,
+            tone: fromBook ? StatusTone.info : StatusTone.neutral,
           ),
         ],
       ),

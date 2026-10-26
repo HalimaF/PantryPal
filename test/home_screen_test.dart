@@ -2,11 +2,13 @@ import 'package:fake_cloud_firestore/fake_cloud_firestore.dart';
 import 'package:firebase_auth_mocks/firebase_auth_mocks.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:what_can_i_cook/logic/days_left.dart';
 import 'package:what_can_i_cook/logic/item_matching.dart';
 import 'package:what_can_i_cook/screens/home_screen.dart';
 import 'package:what_can_i_cook/services/data_service.dart';
-import 'package:what_can_i_cook/theme.dart';
+
+import 'helpers/test_app.dart';
 
 late FakeFirebaseFirestore _db;
 late DataService _data;
@@ -22,12 +24,12 @@ DateTime _inDays(int days) {
 }
 
 Future<void> _open(WidgetTester tester, {String? name = 'Halima'}) async {
+  SharedPreferences.setMockInitialValues({});
   tester.view.physicalSize = const Size(900, 3200);
   tester.view.devicePixelRatio = 1;
   addTearDown(tester.view.reset);
-  await tester.pumpWidget(MaterialApp(
-    theme: buildTheme(useWebFonts: false),
-    home: HomeScreen(
+  await tester.pumpWidget(testApp(
+    HomeScreen(
       user: MockUser(uid: 'u1', displayName: name, email: 'halima@example.com'),
       data: _data,
     ),
@@ -175,7 +177,7 @@ void main() {
       await tester.tap(find.text('Suggest a dish'));
       await tester.pumpAndSettle();
 
-      expect(find.text('Tell me about today'), findsOneWidget);
+      expect(find.text('What to cook'), findsOneWidget);
     });
 
     testWidgets('Add groceries opens its page', (tester) async {

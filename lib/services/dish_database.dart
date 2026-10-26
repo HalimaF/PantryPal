@@ -97,8 +97,9 @@ class DishDatabase {
   /// are never offered as a meal.
   static bool _mealFits(DishRecord d) => d.meal == 'both';
 
-  /// "Light" accepts light and medium; "Heavy" accepts medium and heavy.
+  /// "Light" accepts light and medium; "Medium" only medium; "Heavy" accepts medium and heavy.
   static bool _weightFits(String wanted, DishRecord d) {
+    if (wanted == 'Medium') return d.weight == 'medium';
     if (wanted == 'Light') return d.weight == 'light' || d.weight == 'medium';
     if (wanted == 'Heavy') return d.weight == 'medium' || d.weight == 'heavy';
     return true;
