@@ -52,6 +52,7 @@ dev_dependencies:
   # package. See that file for information about deactivating specific lint
   # rules and activating additional ones.
   flutter_lints: ^6.0.0
+  patrol: ^4.10.0
 
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec
@@ -98,3 +99,12 @@ flutter:
   #
   # For details regarding fonts from package dependencies,
   # see https://flutter.dev/to/font-from-package
+
+# Settings for the Patrol test tool (patrol_cli reads this).
+patrol:
+  app_name: What Can I Cook?
+  android:
+    package_name: com.haleema.what_can_i_cook
+  ios:
+    # Placeholder: this project has no ios/ folder, so nothing uses it yet.
+    bundle_id: com.haleema.whatCanICook
