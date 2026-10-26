@@ -56,6 +56,10 @@ class DataService {
   }
 
   /// The daily log, newest first.
+  /// True while something she changed is still waiting to reach the server. Drives the "Saved" chip.
+  Stream<bool> hasPendingWrites() =>
+      _inventory.snapshots(includeMetadataChanges: true).map((s) => s.metadata.hasPendingWrites);
+
   Stream<List<MealEntry>> meals() => _meals.snapshots().map(_toMeals);
 
   List<MealEntry> _toMeals(QuerySnapshot<Map<String, dynamic>> snapshot) {

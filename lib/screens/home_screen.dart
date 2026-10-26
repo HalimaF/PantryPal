@@ -5,10 +5,12 @@ import '../logic/days_left.dart';
 import '../models/inventory_item.dart';
 import '../models/meal.dart';
 import '../services/data_service.dart';
+import '../state/cook_choices.dart';
 import '../ui/app_button.dart';
 import '../ui/app_card.dart';
 import '../ui/context_ext.dart';
 import '../ui/section_header.dart';
+import '../ui/status_chip.dart';
 import '../ui/tokens.dart';
 import 'add_groceries_screen.dart';
 import 'daily_log_screen.dart';
@@ -48,6 +50,16 @@ class _HomeScreenState extends State<HomeScreen> {
   late final Stream<List<InventoryItem>> _inventory = _data.inventory();
   late final Stream<ShoppingDates> _dates = _data.shoppingDates();
   late final Stream<List<MealEntry>> _meals = _data.meals();
+  late final Stream<bool> _pending = _data.hasPendingWrites();
+  CookChoices _choices = const CookChoices();
+
+  @override
+  void initState() {
+    super.initState();
+    CookChoices.load().then((c) {
+      if (mounted) setState(() => _choices = c);
+    });
+  }
 
   void _openTab(int tab, Widget fallback) {
     final go = widget.onOpenTab;
@@ -96,12 +108,7 @@ class _HomeScreenState extends State<HomeScreen> {
     if (name != null && name.isNotEmpty) await user.updateDisplayName(name);
   }
 
-  String _greeting() {
-    final hour = DateTime.now().hour;
-    if (hour < 12) return 'Good morning';
-    if (hour < 17) return 'Good afternoon';
-    return 'Good evening';
-  }
+  String _greeting() => 'Assalam o Alaikum';
 
   @override
   Widget build(BuildContext context) {
@@ -158,6 +165,8 @@ class _HomeScreenState extends State<HomeScreen> {
                         ],
                       ),
                     ),
+                    _SavedChip(pending: _pending),
+                    const SizedBox(width: Space.xs),
                     IconButton.filledTonal(
                       tooltip: 'Settings',
                       style: IconButton.styleFrom(
@@ -171,7 +180,10 @@ class _HomeScreenState extends State<HomeScreen> {
                   ],
                 ),
                 const SizedBox(height: Space.l),
-                _Hero(onTap: () => _openTab(2, Scaffold(body: DishSuggestionScreen(data: _data)))),
+                _Hero(
+                  choices: _choices,
+                  onTap: () => _openTab(2, Scaffold(body: DishSuggestionScreen(data: _data))),
+                ),
                 const SizedBox(height: Space.l),
                 _KitchenStock(
                   inventory: _inventory,
@@ -194,10 +206,12 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 }
 
-/// The main action: asking what to cook is the heart of the app.
+/// The main action: asking what to cook is the heart of the app. The chips show the choices she
+/// made last time (meal, weight, base), so it is clear what "Suggest a dish" will use.
 class _Hero extends StatelessWidget {
-  const _Hero({required this.onTap});
+  const _Hero({required this.onTap, required this.choices});
   final VoidCallback onTap;
+  final CookChoices choices;
 
   @override
   Widget build(BuildContext context) {
@@ -220,6 +234,11 @@ class _Hero extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                Directionality(
+                  textDirection: TextDirection.rtl,
+                  child: Text('آج کیا پکائیں؟', style: text.titleMedium?.copyWith(color: colors.onPrimary)),
+                ),
+                const SizedBox(height: Space.xs),
                 ConstrainedBox(
                   constraints: const BoxConstraints(maxWidth: 240),
                   child: Text(
@@ -227,10 +246,14 @@ class _Hero extends StatelessWidget {
                     style: text.headlineMedium?.copyWith(color: colors.onPrimary),
                   ),
                 ),
-                const SizedBox(height: Space.s),
-                Text(
-                  "From what's at home, without repeating this week's meals.",
-                  style: text.bodyMedium?.copyWith(color: colors.onPrimary),
+                const SizedBox(height: Space.m),
+                Wrap(
+                  spacing: Space.s,
+                  runSpacing: Space.s,
+                  children: [
+                    for (final label in [choices.meal, choices.weight, choices.base])
+                      _HeroChip(label: label, onTap: onTap),
+                  ],
                 ),
                 const SizedBox(height: Space.l),
                 SizedBox(
@@ -250,6 +273,55 @@ class _Hero extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+class _HeroChip extends StatelessWidget {
+  const _HeroChip({required this.label, required this.onTap});
+  final String label;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.colors;
+    return Material(
+      color: colors.onPrimary.withValues(alpha: 0.18),
+      borderRadius: Corner.smallRadius,
+      child: InkWell(
+        borderRadius: Corner.smallRadius,
+        onTap: onTap,
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(minHeight: 44, minWidth: 64),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: Space.m),
+            child: Center(
+              child: Text(label, style: context.text.labelMedium?.copyWith(color: colors.onPrimary)),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// "Saved" once everything she changed has reached the server, "Saving…" while it has not.
+class _SavedChip extends StatelessWidget {
+  const _SavedChip({required this.pending});
+  final Stream<bool> pending;
+
+  @override
+  Widget build(BuildContext context) {
+    return StreamBuilder<bool>(
+      stream: pending,
+      builder: (context, snapshot) {
+        final waiting = snapshot.data ?? false;
+        return StatusChip(
+          label: waiting ? 'Saving…' : 'Saved',
+          icon: waiting ? Icons.cloud_upload_outlined : Icons.cloud_done_outlined,
+          tone: waiting ? StatusTone.warning : StatusTone.success,
+        );
+      },
     );
   }
 }
@@ -338,8 +410,8 @@ class _StockCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final text = context.text;
     final colors = context.colors;
-    final shown = items.take(5).toList();
     final progress = _progress;
+    final low = items.where(isLowStock).take(3).toList();
     return AppCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -356,6 +428,11 @@ class _StockCard extends StatelessWidget {
           Text(daysUntilMessage(DateTime.now(), next), style: text.titleLarge),
           if (progress != null) ...[
             const SizedBox(height: Space.m),
+            Align(
+              alignment: AlignmentDirectional.centerEnd,
+              child: Text('Shopping day', style: text.labelSmall?.copyWith(color: colors.onSurfaceVariant)),
+            ),
+            const SizedBox(height: Space.xs),
             Semantics(
               label: 'Shopping cycle progress',
               value: '${(progress * 100).round()} percent',
@@ -366,40 +443,21 @@ class _StockCard extends StatelessWidget {
             ),
           ],
           const SizedBox(height: Space.m),
-          for (final item in shown)
-            Padding(
-              padding: const EdgeInsets.symmetric(vertical: Space.xs),
-              child: Row(
-                children: [
-                  Expanded(child: Text(item.name, style: text.bodyLarge)),
-                  Text('${formatAmount(item.amount)} ${item.unit}',
-                      style: text.bodyLarge?.copyWith(fontWeight: FontWeight.w700)),
-                ],
-              ),
-            ),
-          if (items.length > shown.length)
-            Padding(
-              padding: const EdgeInsets.only(top: Space.xs),
-              child: Text('+ ${items.length - shown.length} more',
-                  style: text.bodySmall?.copyWith(color: colors.onSurfaceVariant)),
-            ),
-          const Divider(height: Space.l),
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
+          Wrap(
+            spacing: Space.s,
+            runSpacing: Space.s,
             children: [
-              Text('Total left', style: text.titleMedium),
-              const SizedBox(width: Space.m),
-              Expanded(
-                child: Text(
-                  describeTotals(totalsByUnit(items)),
-                  textAlign: TextAlign.end,
-                  style: text.titleMedium?.copyWith(color: colors.secondary),
-                ),
-              ),
+              if (low.isEmpty)
+                const StatusChip(label: 'Nothing running low', icon: Icons.check_rounded, tone: StatusTone.success)
+              else
+                for (final item in low)
+                  StatusChip(
+                    label: '${item.name}, ${formatAmount(item.amount)} ${item.unit} left',
+                    icon: Icons.warning_amber_rounded,
+                    tone: StatusTone.warning,
+                  ),
             ],
           ),
-          const SizedBox(height: Space.xs),
-          Text('Amounts are approximate.', style: text.bodySmall?.copyWith(color: colors.onSurfaceVariant)),
         ],
       ),
     );
@@ -476,7 +534,7 @@ class _CookedThisWeek extends StatelessWidget {
           );
         }
         return SizedBox(
-          height: 112,
+          height: 120,
           child: ListView.separated(
             scrollDirection: Axis.horizontal,
             itemCount: recent.length,
@@ -490,12 +548,23 @@ class _CookedThisWeek extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(_short[m.date.weekday - 1].toUpperCase(),
-                          style: text.labelSmall?.copyWith(color: colors.onSurfaceVariant)),
+                      Row(
+                        children: [
+                          Container(
+                            width: 28,
+                            height: 28,
+                            decoration: BoxDecoration(color: colors.primaryContainer, shape: BoxShape.circle),
+                            child: Icon(Icons.dinner_dining_rounded, size: 16, color: colors.onPrimaryContainer),
+                          ),
+                          const SizedBox(width: Space.xs),
+                          Text(_short[m.date.weekday - 1].toUpperCase(),
+                              style: text.labelSmall?.copyWith(color: colors.onSurfaceVariant)),
+                        ],
+                      ),
                       const SizedBox(height: Space.xs),
                       Expanded(
                         child: Text(m.dishName,
-                            maxLines: 3, overflow: TextOverflow.ellipsis, style: text.titleMedium),
+                            maxLines: 2, overflow: TextOverflow.ellipsis, style: text.titleMedium),
                       ),
                     ],
                   ),

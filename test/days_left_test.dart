@@ -7,6 +7,7 @@ InventoryItem _item(String name, double amount, String unit) =>
     InventoryItem(id: name, name: name, amount: amount, unit: unit);
 
 void main() {
+  lowStockTests();
   group('sameDayNextMonth', () {
     test('shopping on the 28th means the 28th of next month', () {
       expect(sameDayNextMonth(DateTime(2026, 11, 28)), DateTime(2026, 12, 28));
@@ -116,6 +117,27 @@ void main() {
       final id = itemIdFor('مرغی', 'kg');
       expect(id, isNotEmpty);
       expect(id.contains('/'), isFalse);
+    });
+  });
+}
+
+void lowStockTests() {
+  group('isLowStock', () {
+    InventoryItem item(double amount, String unit) =>
+        InventoryItem(id: 'x', name: 'x', amount: amount, unit: unit);
+
+    test('kg and L are low at 1 or less', () {
+      expect(isLowStock(item(1, 'kg')), isTrue);
+      expect(isLowStock(item(1.5, 'kg')), isFalse);
+      expect(isLowStock(item(0.5, 'L')), isTrue);
+    });
+    test('g and ml are low at 250 or less', () {
+      expect(isLowStock(item(250, 'g')), isTrue);
+      expect(isLowStock(item(500, 'ml')), isFalse);
+    });
+    test('pieces and packs are low at 2 or less', () {
+      expect(isLowStock(item(2, 'pieces')), isTrue);
+      expect(isLowStock(item(3, 'packs')), isFalse);
     });
   });
 }

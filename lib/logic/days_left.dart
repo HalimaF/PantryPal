@@ -68,3 +68,10 @@ String daysUntilMessage(DateTime today, DateTime? next) {
   if (days == 1) return '1 day until your next shopping ($date).';
   return '$days days until your next shopping ($date).';
 }
+
+/// Roughly a day's cooking left: 1 kg or 1 L, 250 g or ml, 2 pieces or packs. Drives the "Low" chips on Home.
+bool isLowStock(InventoryItem item) => switch (item.unit) {
+      'kg' || 'L' => item.amount <= 1,
+      'g' || 'ml' => item.amount <= 250,
+      _ => item.amount <= 2,
+    };

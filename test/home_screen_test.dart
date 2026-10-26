@@ -62,11 +62,9 @@ void main() {
       await _open(tester, name: null);
 
       expect(find.text('Add your name'), findsOneWidget);
-      // just "Good morning/afternoon/evening", with no ", name" after it
+      // just the greeting, with no ", name" after it
       expect(
-        find.byWidgetPredicate(
-          (w) => w is Text && const {'Good morning', 'Good afternoon', 'Good evening'}.contains(w.data),
-        ),
+        find.byWidgetPredicate((w) => w is Text && w.data == 'Assalam o Alaikum'),
         findsOneWidget,
       );
     });
@@ -93,9 +91,9 @@ void main() {
       expect(find.text('Total left'), findsNothing);
     });
 
-    testWidgets('shows the days until shopping, every item and the total', (tester) async {
+    testWidgets('shows the days until shopping and says when nothing is running low', (tester) async {
       await _data.addItems([
-        const NewItem(name: 'Chicken', amount: 1.5, unit: 'kg'),
+        const NewItem(name: 'Chicken', amount: 3, unit: 'kg'),
         const NewItem(name: 'Rice', amount: 5, unit: 'kg'),
         const NewItem(name: 'Eggs', amount: 12, unit: 'pieces'),
       ]);
@@ -103,13 +101,24 @@ void main() {
       await _open(tester);
 
       expect(find.textContaining('10 days until your next shopping'), findsOneWidget);
-      expect(find.text('Chicken'), findsOneWidget);
-      expect(find.text('1.5 kg'), findsOneWidget);
-      expect(find.text('5 kg'), findsOneWidget);
-      expect(find.text('12 pieces'), findsOneWidget);
-      expect(find.text('6.5 kg, 12 pieces'), findsOneWidget); // units are never mixed
-      expect(find.text('Amounts are approximate.'), findsOneWidget);
+      expect(find.text('Shopping day'), findsOneWidget);
+      expect(find.text('Nothing running low'), findsOneWidget);
       expect(find.text('No groceries yet'), findsNothing);
+    });
+
+    testWidgets('low items get a chip with what is left', (tester) async {
+      await _data.addItems([
+        const NewItem(name: 'Milk', amount: 0.5, unit: 'L'),
+        const NewItem(name: 'Rice', amount: 5, unit: 'kg'),
+        const NewItem(name: 'Eggs', amount: 2, unit: 'pieces'),
+      ]);
+      await _data.saveShoppingDates(last: _today(), next: _inDays(10));
+      await _open(tester);
+
+      expect(find.text('Milk, 0.5 L left'), findsOneWidget);
+      expect(find.text('Eggs, 2 pieces left'), findsOneWidget);
+      expect(find.textContaining('Rice,'), findsNothing);
+      expect(find.text('Nothing running low'), findsNothing);
     });
 
     testWidgets('says so when the shopping day is today, tomorrow, or has passed', (tester) async {
@@ -139,25 +148,24 @@ void main() {
       await _data.addItems([const NewItem(name: 'Rice', amount: 5, unit: 'kg')]);
       await _data.saveShoppingDates(last: _today(), next: _inDays(5));
       await _open(tester);
-      expect(find.text('Chicken'), findsNothing);
+      expect(find.text('Chicken, 1 kg left'), findsNothing);
 
       await _data.addItems([const NewItem(name: 'Chicken', amount: 1, unit: 'kg')]);
       await tester.pumpAndSettle();
 
-      expect(find.text('Chicken'), findsOneWidget);
-      expect(find.text('6 kg'), findsOneWidget);
+      expect(find.text('Chicken, 1 kg left'), findsOneWidget);
     });
 
-    testWidgets('an item that is used up disappears from the list', (tester) async {
-      await _data.addItems([const NewItem(name: 'Rice', amount: 5, unit: 'kg')]);
+    testWidgets('an item that is used up disappears from the dashboard', (tester) async {
+      await _data.addItems([const NewItem(name: 'Rice', amount: 1, unit: 'kg')]);
       await _data.saveShoppingDates(last: _today(), next: _inDays(5));
       await _open(tester);
-      expect(find.text('Rice'), findsOneWidget);
+      expect(find.text('Rice, 1 kg left'), findsOneWidget);
 
       await _db.doc('users/u1/inventory/${itemDocId('Rice', 'kg')}').delete();
       await tester.pumpAndSettle();
 
-      expect(find.text('Rice'), findsNothing);
+      expect(find.textContaining('Rice,'), findsNothing);
       expect(find.text('No groceries yet'), findsOneWidget);
     });
 
