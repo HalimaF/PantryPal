@@ -68,6 +68,11 @@ You need Flutter, an Android phone or emulator, and a Firebase project.
    flutter analyze
    flutter test
    ```
+5. **Try the app on a real phone** (both start the app logged out, so they need no account):
+   ```
+   maestro test maestro/                                          # Maestro: runs the installed app as it is
+   patrol test --target patrol_test/auth_screen_test.dart         # Patrol: builds a test version of the app
+   ```
 
 ## Your own recipe book
 

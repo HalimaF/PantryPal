@@ -1,0 +1,13 @@
+# Same check as the Patrol test "the login screen switches to sign up and asks for a name".
+# Starts logged out (clearState) and only taps around the login screen: no account, writes nothing.
+appId: com.haleema.what_can_i_cook
+---
+- launchApp:
+    clearState: true
+- assertVisible: "What can I cook today?"
+- assertNotVisible: "Your name"
+- tapOn: "Sign up"
+- assertVisible: "Your name"
+- assertVisible: "Create my account"
+- tapOn: "Log in"
+- assertNotVisible: "Your name"
