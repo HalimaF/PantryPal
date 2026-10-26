@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:what_can_i_cook/screens/auth_screen.dart';
-import 'package:what_can_i_cook/theme.dart';
+
+import 'helpers/test_app.dart';
 
 void main() {
   testWidgets('auth screen switches between sign in and create an account', (tester) async {
@@ -9,7 +10,7 @@ void main() {
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.reset);
     await tester.pumpWidget(
-      MaterialApp(theme: buildTheme(useWebFonts: false), home: const AuthScreen()),
+      testApp(const AuthScreen()),
     );
 
     expect(find.widgetWithText(FilledButton, 'Sign in'), findsOneWidget);

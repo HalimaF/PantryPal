@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 
 import '../ui/app_button.dart';
 import '../ui/context_ext.dart';
+import '../ui/labels.dart';
 import '../ui/tokens.dart';
 
 /// Sign-in and sign-up on one screen. Implements prd.md > Account.
@@ -53,15 +54,15 @@ class _AuthScreenState extends State<AuthScreen> {
       _emailError = null;
     });
     if (_signingUp && name.isEmpty) {
-      setState(() => _error = 'Please tell us your name.');
+      setState(() => _error = context.l10n.errName);
       return;
     }
     if (email.isEmpty || password.isEmpty) {
-      setState(() => _error = 'Please enter your email and password.');
+      setState(() => _error = context.l10n.errEmailPassword);
       return;
     }
     if (!_looksLikeEmail(email)) {
-      setState(() => _emailError = 'Add the full address, like name@gmail.com');
+      setState(() => _emailError = context.l10n.errEmailFormat);
       return;
     }
     setState(() => _busy = true);
@@ -79,7 +80,7 @@ class _AuthScreenState extends State<AuthScreen> {
       }
       // main.dart listens to the login state and switches to Home by itself.
     } on FirebaseAuthException catch (e) {
-      setState(() => _error = friendlyAuthError(e.code));
+      setState(() => _error = context.l10n.authError(e.code));
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -93,14 +94,14 @@ class _AuthScreenState extends State<AuthScreen> {
       _emailError = null;
     });
     if (!_looksLikeEmail(email)) {
-      setState(() => _emailError = 'Type your email above first, then tap Forgot password.');
+      setState(() => _emailError = context.l10n.errTypeEmailFirst);
       return;
     }
     try {
       await FirebaseAuth.instance.sendPasswordResetEmail(email: email);
-      if (mounted) setState(() => _info = 'We sent a link to $email. Open it to choose a new password.');
+      if (mounted) setState(() => _info = context.l10n.resetSent(email));
     } on FirebaseAuthException catch (e) {
-      if (mounted) setState(() => _error = friendlyAuthError(e.code));
+      if (mounted) setState(() => _error = context.l10n.authError(e.code));
     }
   }
 
@@ -116,7 +117,7 @@ class _AuthScreenState extends State<AuthScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                _Hero(title: 'Pantry Pal', subtitle: 'Decide dinner in a minute, from what is already in your kitchen.'),
+                _Hero(title: context.l10n.appName, subtitle: context.l10n.authTagline),
                 Padding(
                   padding: const EdgeInsets.fromLTRB(Space.l, Space.l, Space.l, Space.l),
                   child: AutofillGroup(
@@ -124,7 +125,7 @@ class _AuthScreenState extends State<AuthScreen> {
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
                         if (_signingUp) ...[
-                          Text('Your name', style: text.labelMedium),
+                          Text(context.l10n.labelName, style: text.labelMedium),
                           const SizedBox(height: Space.xs),
                           TextField(
                             key: const Key('name'),
@@ -132,11 +133,11 @@ class _AuthScreenState extends State<AuthScreen> {
                             textCapitalization: TextCapitalization.words,
                             textInputAction: TextInputAction.next,
                             autofillHints: const [AutofillHints.givenName],
-                            decoration: const InputDecoration(hintText: 'For example: Ayesha'),
+                            decoration: InputDecoration(hintText: context.l10n.nameHint),
                           ),
                           const SizedBox(height: Space.m),
                         ],
-                        Text('Email', style: text.labelMedium),
+                        Text(context.l10n.labelEmail, style: text.labelMedium),
                         const SizedBox(height: Space.xs),
                         TextField(
                           key: const Key('email'),
@@ -145,7 +146,7 @@ class _AuthScreenState extends State<AuthScreen> {
                           textInputAction: TextInputAction.next,
                           autofillHints: const [AutofillHints.email],
                           decoration: InputDecoration(
-                            hintText: 'name@gmail.com',
+                            hintText: context.l10n.emailHint,
                             error: _emailError == null ? null : _FieldError(_emailError!),
                             enabledBorder: _emailError == null
                                 ? null
@@ -156,7 +157,7 @@ class _AuthScreenState extends State<AuthScreen> {
                           ),
                         ),
                         const SizedBox(height: Space.m),
-                        Text('Password', style: text.labelMedium),
+                        Text(context.l10n.labelPassword, style: text.labelMedium),
                         const SizedBox(height: Space.xs),
                         TextField(
                           key: const Key('password'),
@@ -165,14 +166,14 @@ class _AuthScreenState extends State<AuthScreen> {
                           autofillHints: const [AutofillHints.password],
                           onSubmitted: (_) => _submit(),
                           decoration: InputDecoration(
-                            helperText: _signingUp ? 'At least 6 characters' : null,
+                            helperText: _signingUp ? context.l10n.passwordHelper : null,
                             suffixIcon: TextButton.icon(
                               onPressed: () => setState(() => _showPassword = !_showPassword),
                               icon: Icon(
                                 _showPassword ? Icons.visibility_off_outlined : Icons.visibility_outlined,
                                 size: 20,
                               ),
-                              label: Text(_showPassword ? 'Hide' : 'Show'),
+                              label: Text(_showPassword ? context.l10n.hide : context.l10n.show),
                             ),
                           ),
                         ),
@@ -181,7 +182,7 @@ class _AuthScreenState extends State<AuthScreen> {
                             alignment: AlignmentDirectional.centerEnd,
                             child: TextButton(
                               onPressed: _busy ? null : _forgotPassword,
-                              child: const Text('Forgot password?'),
+                              child: Text(context.l10n.forgotPassword),
                             ),
                           ),
                         if (_error != null) ...[
@@ -194,14 +195,14 @@ class _AuthScreenState extends State<AuthScreen> {
                         ],
                         const SizedBox(height: Space.m),
                         AppButton(
-                          label: _signingUp ? 'Create my account' : 'Sign in',
+                          label: _signingUp ? context.l10n.createMyAccount : context.l10n.signIn,
                           loading: _busy,
-                          loadingLabel: _signingUp ? 'Creating your account…' : 'Signing in…',
+                          loadingLabel: _signingUp ? context.l10n.creatingAccount : context.l10n.signingIn,
                           onPressed: _submit,
                         ),
                         const SizedBox(height: Space.s),
                         AppButton(
-                          label: _signingUp ? 'I already have an account' : 'Create an account',
+                          label: _signingUp ? context.l10n.haveAccount : context.l10n.createAccount,
                           kind: AppButtonKind.secondary,
                           onPressed: _busy ? null : () => _switchMode(!_signingUp),
                         ),
@@ -213,7 +214,7 @@ class _AuthScreenState extends State<AuthScreen> {
                             const SizedBox(width: Space.xs),
                             Flexible(
                               child: Text(
-                                'Your groceries and family details stay private to your account.',
+                                context.l10n.privateNote,
                                 textAlign: TextAlign.center,
                                 style: text.bodySmall?.copyWith(color: colors.onSurfaceVariant),
                               ),

@@ -9,6 +9,7 @@ import '../state/cook_choices.dart';
 import '../ui/app_button.dart';
 import '../ui/app_card.dart';
 import '../ui/context_ext.dart';
+import '../ui/labels.dart';
 import '../ui/section_header.dart';
 import '../ui/status_chip.dart';
 import '../ui/tokens.dart';
@@ -34,13 +35,6 @@ class HomeScreen extends StatefulWidget {
   @override
   State<HomeScreen> createState() => _HomeScreenState();
 }
-
-const _weekdays = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
-const _months = [
-  'January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October',
-  'November', 'December',
-];
-const _short = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
 class _HomeScreenState extends State<HomeScreen> {
   User get user => widget.user;
@@ -87,19 +81,19 @@ class _HomeScreenState extends State<HomeScreen> {
     final name = await showDialog<String>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('What should we call you?'),
+        title: Text(context.l10n.askNameTitle),
         content: TextField(
           controller: controller,
           autofocus: true,
           textCapitalization: TextCapitalization.words,
-          decoration: const InputDecoration(labelText: 'Your name'),
+          decoration: InputDecoration(labelText: context.l10n.askNameLabel),
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Not now')),
+          TextButton(onPressed: () => Navigator.pop(context), child: Text(context.l10n.askNameNotNow)),
           FilledButton(
             style: FilledButton.styleFrom(minimumSize: const Size(96, 48)),
             onPressed: () => Navigator.pop(context, controller.text.trim()),
-            child: const Text('Save'),
+            child: Text(context.l10n.save),
           ),
         ],
       ),
@@ -107,8 +101,6 @@ class _HomeScreenState extends State<HomeScreen> {
     // The controller is not disposed here: the dialog is still fading out and would crash.
     if (name != null && name.isNotEmpty) await user.updateDisplayName(name);
   }
-
-  String _greeting() => 'Assalam o Alaikum';
 
   @override
   Widget build(BuildContext context) {
@@ -140,11 +132,11 @@ class _HomeScreenState extends State<HomeScreen> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            '${_weekdays[now.weekday - 1]}, ${now.day} ${_months[now.month - 1]}',
+                            context.l10n.dateLine(now),
                             style: text.bodySmall?.copyWith(color: colors.onSurfaceVariant),
                           ),
                           Text(
-                            name.isEmpty ? _greeting() : '${_greeting()}, $name',
+                            name.isEmpty ? context.l10n.homeGreeting : '${context.l10n.homeGreeting}, $name',
                             maxLines: 2,
                             overflow: TextOverflow.ellipsis,
                             style: text.headlineMedium,
@@ -157,10 +149,10 @@ class _HomeScreenState extends State<HomeScreen> {
                               ),
                               onPressed: () => _askName(context),
                               icon: const Icon(Icons.edit_outlined, size: 18),
-                              label: const Text('Add your name'),
+                              label: Text(context.l10n.homeAddName),
                             )
                           else
-                            Text("What's on the menu today?",
+                            Text(context.l10n.homeMenuToday,
                                 style: text.bodyMedium?.copyWith(color: colors.onSurfaceVariant)),
                         ],
                       ),
@@ -168,7 +160,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     _SavedChip(pending: _pending),
                     const SizedBox(width: Space.xs),
                     IconButton.filledTonal(
-                      tooltip: 'Settings',
+                      tooltip: context.l10n.settings,
                       style: IconButton.styleFrom(
                         backgroundColor: colors.primaryContainer,
                         foregroundColor: colors.onPrimaryContainer,
@@ -194,7 +186,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       .push(MaterialPageRoute(builder: (_) => AddGroceriesScreen(data: _data))),
                 ),
                 const SizedBox(height: Space.l),
-                SectionHeader('Cooked this week', actionLabel: 'Daily log', onAction: _openDailyLog),
+                SectionHeader(context.l10n.cookedThisWeek, actionLabel: context.l10n.dailyLog, onAction: _openDailyLog),
                 const SizedBox(height: Space.s),
                 _CookedThisWeek(meals: _meals, onLog: _openLogDish),
               ],
@@ -235,14 +227,14 @@ class _Hero extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Directionality(
-                  textDirection: TextDirection.rtl,
-                  child: Text('آج کیا پکائیں؟', style: text.titleMedium?.copyWith(color: colors.onPrimary)),
+                  textDirection: Localizations.localeOf(context).languageCode == 'ur' ? TextDirection.ltr : TextDirection.rtl,
+                  child: Text(context.l10n.heroAltLine, style: text.titleMedium?.copyWith(color: colors.onPrimary)),
                 ),
                 const SizedBox(height: Space.xs),
                 ConstrainedBox(
                   constraints: const BoxConstraints(maxWidth: 240),
                   child: Text(
-                    'What should we cook today?',
+                    context.l10n.heroTitle,
                     style: text.headlineMedium?.copyWith(color: colors.onPrimary),
                   ),
                 ),
@@ -252,7 +244,7 @@ class _Hero extends StatelessWidget {
                   runSpacing: Space.s,
                   children: [
                     for (final label in [choices.meal, choices.weight, choices.base])
-                      _HeroChip(label: label, onTap: onTap),
+                      _HeroChip(label: context.l10n.option(label), onTap: onTap),
                   ],
                 ),
                 const SizedBox(height: Space.l),
@@ -265,7 +257,7 @@ class _Hero extends StatelessWidget {
                     ),
                     onPressed: onTap,
                     icon: const Icon(Icons.auto_awesome_rounded),
-                    label: const Text('Suggest a dish'),
+                    label: Text(context.l10n.suggestDish),
                   ),
                 ),
               ],
@@ -317,7 +309,7 @@ class _SavedChip extends StatelessWidget {
       builder: (context, snapshot) {
         final waiting = snapshot.data ?? false;
         return StatusChip(
-          label: waiting ? 'Saving…' : 'Saved',
+          label: waiting ? context.l10n.saving : context.l10n.saved,
           icon: waiting ? Icons.cloud_upload_outlined : Icons.cloud_done_outlined,
           tone: waiting ? StatusTone.warning : StatusTone.success,
         );
@@ -348,7 +340,7 @@ class _KitchenStock extends StatelessWidget {
       stream: inventory,
       builder: (context, snapshot) {
         if (snapshot.hasError) {
-          return ErrorStateCard(message: 'Could not load your groceries. Please check your internet.');
+          return ErrorStateCard(message: context.l10n.couldNotLoadGroceries);
         }
         if (!snapshot.hasData) {
           return const AppCard(child: SizedBox(height: 120, child: Center(child: CircularProgressIndicator())));
@@ -419,23 +411,23 @@ class _StockCard extends StatelessWidget {
           Row(
             children: [
               Expanded(
-                child: Text('KITCHEN STOCK',
+                child: Text(context.l10n.kitchenStock,
                     style: text.labelSmall?.copyWith(color: colors.onSurfaceVariant, letterSpacing: 0.8)),
               ),
-              if (onSeeAll != null) TextButton(onPressed: onSeeAll, child: const Text('See all')),
+              if (onSeeAll != null) TextButton(onPressed: onSeeAll, child: Text(context.l10n.seeAll)),
             ],
           ),
-          Text(daysUntilMessage(DateTime.now(), next), style: text.titleLarge),
+          Text(context.l10n.daysMessage(DateTime.now(), next), style: text.titleLarge),
           if (progress != null) ...[
             const SizedBox(height: Space.m),
             Align(
               alignment: AlignmentDirectional.centerEnd,
-              child: Text('Shopping day', style: text.labelSmall?.copyWith(color: colors.onSurfaceVariant)),
+              child: Text(context.l10n.shoppingDay, style: text.labelSmall?.copyWith(color: colors.onSurfaceVariant)),
             ),
             const SizedBox(height: Space.xs),
             Semantics(
-              label: 'Shopping cycle progress',
-              value: '${(progress * 100).round()} percent',
+              label: context.l10n.shoppingCycleProgress,
+              value: context.l10n.percentValue((progress * 100).round()),
               child: ClipRRect(
                 borderRadius: BorderRadius.circular(8),
                 child: LinearProgressIndicator(value: progress, color: colors.secondary),
@@ -448,11 +440,11 @@ class _StockCard extends StatelessWidget {
             runSpacing: Space.s,
             children: [
               if (low.isEmpty)
-                const StatusChip(label: 'Nothing running low', icon: Icons.check_rounded, tone: StatusTone.success)
+                StatusChip(label: context.l10n.nothingLow, icon: Icons.check_rounded, tone: StatusTone.success)
               else
                 for (final item in low)
                   StatusChip(
-                    label: '${item.name}, ${formatAmount(item.amount)} ${item.unit} left',
+                    label: context.l10n.lowLeft(item.name, '${formatAmount(item.amount)} ${context.l10n.unit(item.unit)}'),
                     icon: Icons.warning_amber_rounded,
                     tone: StatusTone.warning,
                   ),
@@ -479,17 +471,17 @@ class _StockEmpty extends StatelessWidget {
             children: [
               Icon(Icons.shopping_basket_rounded, color: context.colors.onSurfaceVariant),
               const SizedBox(width: Space.m),
-              Expanded(child: Text('No groceries yet', style: context.text.titleLarge)),
+              Expanded(child: Text(context.l10n.noGroceriesYet, style: context.text.titleLarge)),
             ],
           ),
           const SizedBox(height: Space.s),
           Text(
-            "Add this month's shopping and I will keep track of what is left and how many days until your next trip.",
+            context.l10n.noGroceriesBody,
             style: context.text.bodyMedium?.copyWith(color: context.colors.onSurfaceVariant),
           ),
           const SizedBox(height: Space.m),
           AppButton(
-            label: 'Add groceries',
+            label: context.l10n.addGroceries,
             icon: Icons.add_rounded,
             kind: AppButtonKind.secondary,
             onPressed: onAdd,
@@ -526,7 +518,7 @@ class _CookedThisWeek extends StatelessWidget {
                 Icon(Icons.menu_book_rounded, color: colors.onSurfaceVariant),
                 const SizedBox(width: Space.m),
                 Expanded(
-                  child: Text('Nothing cooked yet this week. Tap to log a dish.',
+                  child: Text(context.l10n.nothingCookedWeek,
                       style: text.bodyMedium?.copyWith(color: colors.onSurfaceVariant)),
                 ),
               ],
@@ -557,7 +549,7 @@ class _CookedThisWeek extends StatelessWidget {
                             child: Icon(Icons.dinner_dining_rounded, size: 16, color: colors.onPrimaryContainer),
                           ),
                           const SizedBox(width: Space.xs),
-                          Text(_short[m.date.weekday - 1].toUpperCase(),
+                          Text(context.l10n.weekdayShort(m.date).toUpperCase(),
                               style: text.labelSmall?.copyWith(color: colors.onSurfaceVariant)),
                         ],
                       ),

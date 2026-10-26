@@ -13,12 +13,16 @@ class SegmentedChoice extends StatelessWidget {
     required this.options,
     required this.selected,
     required this.onSelected,
+    this.labelOf,
   });
 
   final String label;
   final List<String> options;
   final String selected;
   final ValueChanged<String> onSelected;
+
+  /// Words to show for a stored value (translation). Defaults to the value itself.
+  final String Function(String value)? labelOf;
 
   @override
   Widget build(BuildContext context) {
@@ -41,7 +45,7 @@ class SegmentedChoice extends StatelessWidget {
                     child: Semantics(
                       button: true,
                       selected: o == selected,
-                      label: o,
+                      label: labelOf?.call(o) ?? o,
                       excludeSemantics: true,
                       onTap: () => onSelected(o),
                       child: InkWell(
@@ -69,7 +73,7 @@ class SegmentedChoice extends StatelessWidget {
                               ],
                               Flexible(
                                 child: Text(
-                                  o,
+                                  labelOf?.call(o) ?? o,
                                   maxLines: 1,
                                   overflow: TextOverflow.ellipsis,
                                   style: text.labelMedium?.copyWith(

@@ -13,6 +13,7 @@ import '../ui/app_card.dart';
 import '../ui/app_snackbar.dart';
 import '../ui/confirm_dialog.dart';
 import '../ui/context_ext.dart';
+import '../ui/labels.dart';
 import '../ui/haptics.dart';
 import '../ui/quantity_stepper.dart';
 import '../ui/section_header.dart';
@@ -130,7 +131,7 @@ class _AddGroceriesScreenState extends State<AddGroceriesScreen> {
     try {
       photo = await (widget.pickPhoto ?? pickPhotoFromDevice)(source);
     } catch (_) {
-      if (mounted) setState(() => _error = 'Could not open the photos. Please type what you bought.');
+      if (mounted) setState(() => _error = context.l10n.cannotOpenPhotos);
       return;
     }
     if (photo == null || !mounted) return; // she backed out
@@ -156,12 +157,12 @@ class _AddGroceriesScreenState extends State<AddGroceriesScreen> {
           for (final i in items) _Line(name: i.name, amount: i.amount, unit: i.unit ?? 'kg', fromPhoto: true),
         ]);
         final check = items.where((i) => i.amount == null).length;
-        _photoNote = 'We found ${items.length} ${items.length == 1 ? 'item' : 'items'} in your photo.'
-            '${check == 0 ? '' : ' $check ${check == 1 ? 'needs' : 'need'} a check.'}';
+        final l10n = context.l10n;
+        _photoNote = l10n.foundItems(items.length) + (check == 0 ? '' : ' ${l10n.needCheck(check)}');
       } else {
         _photoNote = failed
-            ? 'I could not read that photo. Please type what it is.'
-            : 'I could not tell what this is. Please type it.';
+            ? context.l10n.cannotReadPhoto
+            : context.l10n.cannotTell;
       }
     });
   }
@@ -204,11 +205,11 @@ class _AddGroceriesScreenState extends State<AddGroceriesScreen> {
   Future<void> _saveAll() async {
     final missing = _draft.where((l) => l.needsCheck).toList();
     if (missing.isNotEmpty) {
-      setState(() => _error = 'Please say how much ${missing.first.name}, or remove it.');
+      setState(() => _error = context.l10n.pleaseSayHowMuch(missing.first.name));
       return;
     }
     if (daysUntil(_shopped, _next) <= 0) {
-      setState(() => _error = 'The next shopping day must come after the day you shopped.');
+      setState(() => _error = context.l10n.nextAfterShopped);
       return;
     }
     final items = [for (final l in _draft) (name: l.name.trim(), amount: l.amount!, unit: l.unit)];
@@ -231,7 +232,7 @@ class _AddGroceriesScreenState extends State<AddGroceriesScreen> {
     } catch (_) {
       if (mounted) {
         setState(() {
-          _error = 'Could not save. Please check your internet and try again.';
+          _error = context.l10n.couldNotSave;
           _busy = false;
         });
       }
@@ -255,27 +256,27 @@ class _AddGroceriesScreenState extends State<AddGroceriesScreen> {
     List<AddResult> results,
     bool savedOffline,
   ) {
-    if (savedOffline) return 'Saved on your phone. It will sync when you are online.';
+    final l10n = context.l10n;
+    if (savedOffline) return l10n.savedOffline;
     final raised = results.where((r) => r.merged).toList();
     if (items.length == 1) {
       if (raised.length == 1) {
         final r = raised.single;
-        return '${r.name} was already in your kitchen, so now you have ${formatAmount(r.newTotal)} ${r.unit}.';
+        return l10n.alreadyThere(r.name, formatAmount(r.newTotal), l10n.unit(r.unit));
       }
       final one = items.first;
-      return 'Added ${one.name}, ${formatAmount(one.amount)} ${one.unit}.';
+      return l10n.addedOne(one.name, formatAmount(one.amount), l10n.unit(one.unit));
     }
-    if (raised.isEmpty) return 'Added ${items.length} items.';
-    final names = raised.map((r) => r.name).toSet().join(', ');
-    return 'Added ${items.length} items. $names ${raised.length == 1 ? 'was' : 'were'} already in your kitchen, so the amount went up.';
+    if (raised.isEmpty) return l10n.addedMany(items.length);
+    return l10n.addedManyRaised(items.length, raised.map((r) => r.name).toSet().join(', '));
   }
 
   Future<void> _confirmRemove(InventoryItem item) async {
     final remove = await confirmAction(
       context,
-      title: 'Remove ${item.name}?',
-      message: 'It will disappear from your groceries.',
-      confirmLabel: 'Remove',
+      title: context.l10n.removeNamedQ(item.name),
+      message: context.l10n.removeBody,
+      confirmLabel: context.l10n.remove,
     );
     if (remove) await widget.data.removeItem(item.id);
   }
@@ -294,10 +295,10 @@ class _AddGroceriesScreenState extends State<AddGroceriesScreen> {
               child: Padding(
                 padding: const EdgeInsets.fromLTRB(Space.l, Space.s, Space.l, Space.s),
                 child: AppButton(
-                  label: _draft.length == 1 ? 'Save 1 item' : 'Save all ${_draft.length} items',
+                  label: _draft.length == 1 ? context.l10n.saveOneItem : context.l10n.saveAllItems(_draft.length),
                   icon: Icons.check_rounded,
                   loading: _busy,
-                  loadingLabel: 'Saving…',
+                  loadingLabel: context.l10n.saving,
                   onPressed: _saveAll,
                 ),
               ),
@@ -309,9 +310,9 @@ class _AddGroceriesScreenState extends State<AddGroceriesScreen> {
             child: ListView(
               padding: const EdgeInsets.fromLTRB(Space.l, Space.m, Space.l, Space.l),
               children: [
-                Text('Add groceries', style: text.headlineMedium),
+                Text(context.l10n.addGroceries, style: text.headlineMedium),
                 const SizedBox(height: Space.xs),
-                Text("This month's shopping, by photo or by typing",
+                Text(context.l10n.addSubtitle,
                     style: text.bodySmall?.copyWith(color: colors.onSurfaceVariant)),
                 const SizedBox(height: Space.m),
                 Row(
@@ -319,7 +320,7 @@ class _AddGroceriesScreenState extends State<AddGroceriesScreen> {
                     Expanded(
                       child: _BigChoice(
                         icon: Icons.photo_camera_rounded,
-                        label: 'Take a photo',
+                        label: context.l10n.takePhoto,
                         highlighted: true,
                         onTap: _reading ? null : () => _addByPhoto(PhotoSource.camera),
                       ),
@@ -328,7 +329,7 @@ class _AddGroceriesScreenState extends State<AddGroceriesScreen> {
                     Expanded(
                       child: _BigChoice(
                         icon: Icons.edit_outlined,
-                        label: 'Type it in',
+                        label: context.l10n.typeItIn,
                         onTap: () => _editLine(),
                       ),
                     ),
@@ -339,7 +340,7 @@ class _AddGroceriesScreenState extends State<AddGroceriesScreen> {
                   child: TextButton.icon(
                     onPressed: _reading ? null : () => _addByPhoto(PhotoSource.gallery),
                     icon: const Icon(Icons.photo_library_outlined, size: 20),
-                    label: const Text('Choose a photo'),
+                    label: Text(context.l10n.choosePhoto),
                   ),
                 ),
                 if (_reading && _photo != null) ...[
@@ -368,7 +369,7 @@ class _AddGroceriesScreenState extends State<AddGroceriesScreen> {
                   const SizedBox(height: Space.s),
                 ],
                 const SizedBox(height: Space.s),
-                Text('OFTEN BOUGHT',
+                Text(context.l10n.oftenBought,
                     style: text.labelSmall?.copyWith(color: colors.onSurfaceVariant, letterSpacing: 0.8)),
                 const SizedBox(height: Space.s),
                 Wrap(
@@ -378,40 +379,40 @@ class _AddGroceriesScreenState extends State<AddGroceriesScreen> {
                     for (final o in _oftenBought)
                       ActionChip(
                         avatar: Icon(Icons.add_rounded, size: 18, color: colors.primary),
-                        label: Text(o.name),
+                        label: Text(context.l10n.option(o.name)),
                         onPressed: () => _addLine(_Line(name: o.name, amount: o.amount, unit: o.unit)),
                       ),
                   ],
                 ),
                 const SizedBox(height: Space.l),
-                const SectionHeader('Shopping days'),
+                SectionHeader(context.l10n.shoppingDays),
                 const SizedBox(height: Space.s),
                 AppCard(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      _DateRow(label: 'I shopped on', date: _shopped, onTap: _pickShopped),
+                      _DateRow(label: context.l10n.iShoppedOn, date: _shopped, onTap: _pickShopped),
                       const Divider(height: Space.l),
-                      _DateRow(label: 'Next shopping', date: _next, onTap: _pickNext),
+                      _DateRow(label: context.l10n.nextShopping, date: _next, onTap: _pickNext),
                       const SizedBox(height: Space.xs),
-                      Text(daysUntilMessage(_shopped, _next),
+                      Text(context.l10n.daysMessage(_shopped, _next),
                           style: text.bodySmall?.copyWith(color: colors.onSurfaceVariant)),
                     ],
                   ),
                 ),
                 const SizedBox(height: Space.l),
-                const SectionHeader('In your kitchen now'),
+                SectionHeader(context.l10n.inKitchenNow),
                 const SizedBox(height: Space.s),
                 StreamBuilder<List<InventoryItem>>(
                   stream: _inventory,
                   builder: (context, snapshot) {
                     final items = snapshot.data ?? const <InventoryItem>[];
                     if (snapshot.hasError) {
-                      return Text('Could not load your groceries. Please check your internet.',
+                      return Text(context.l10n.couldNotLoadGroceries,
                           style: text.bodyMedium?.copyWith(color: colors.onSurfaceVariant));
                     }
                     if (items.isEmpty) {
-                      return Text('Nothing added yet.',
+                      return Text(context.l10n.nothingAddedYet,
                           style: text.bodyMedium?.copyWith(color: colors.onSurfaceVariant));
                     }
                     return AppCard(
@@ -422,9 +423,9 @@ class _AddGroceriesScreenState extends State<AddGroceriesScreen> {
                             if (i > 0) const Divider(),
                             ListTile(
                               title: Text(items[i].name, style: text.titleMedium),
-                              subtitle: Text('${formatAmount(items[i].amount)} ${items[i].unit}'),
+                              subtitle: Text('${formatAmount(items[i].amount)} ${context.l10n.unit(items[i].unit)}'),
                               trailing: IconButton(
-                                tooltip: 'Remove ${items[i].name}',
+                                tooltip: context.l10n.removeNamedTip(items[i].name),
                                 icon: const Icon(Icons.delete_outline_rounded),
                                 onPressed: () => _confirmRemove(items[i]),
                               ),
@@ -486,7 +487,7 @@ class _ReadingCard extends StatelessWidget {
           const SizedBox(width: Space.m),
           const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2.5)),
           const SizedBox(width: Space.m),
-          Expanded(child: Text('Reading your photo…', style: context.text.bodyMedium)),
+          Expanded(child: Text(context.l10n.readingPhoto, style: context.text.bodyMedium)),
         ],
       ),
     );
@@ -564,7 +565,7 @@ class _LineCard extends StatelessWidget {
     final check = line.needsCheck;
     return AppCard(
       onTap: onEdit,
-      semanticsLabel: check ? '${line.name}. Amount unclear. Tap to fix.' : null,
+      semanticsLabel: check ? '${line.name}. ${context.l10n.amountUnclear}' : null,
       color: check ? app.warningContainer : null,
       borderColor: check ? app.warning : null,
       padding: const EdgeInsets.all(Space.m),
@@ -588,13 +589,13 @@ class _LineCard extends StatelessWidget {
                       Icon(Icons.warning_amber_rounded, size: 16, color: app.onWarningContainer),
                       const SizedBox(width: Space.xs),
                       Expanded(
-                        child: Text('Amount unclear. Tap to fix.',
+                        child: Text(context.l10n.amountUnclear,
                             style: text.bodySmall?.copyWith(color: app.onWarningContainer)),
                       ),
                     ],
                   )
                 else
-                  Text(line.unit, style: text.bodySmall?.copyWith(color: colors.onSurfaceVariant)),
+                  Text(context.l10n.unit(line.unit), style: text.bodySmall?.copyWith(color: colors.onSurfaceVariant)),
               ],
             ),
           ),
@@ -602,7 +603,7 @@ class _LineCard extends StatelessWidget {
             QuantityStepper(
               value: line.amount!,
               onChanged: onAmount,
-              unitLabel: line.unit,
+              unitLabel: context.l10n.unit(line.unit),
               itemName: line.name,
               min: line.step,
               step: line.step,
@@ -649,11 +650,11 @@ class _LineSheetState extends State<_LineSheet> {
     final name = _name.text.trim();
     final amount = parseAmount(_amount.text);
     if (name.isEmpty) {
-      setState(() => _error = 'Please type what you bought, for example chicken.');
+      setState(() => _error = context.l10n.pleaseTypeWhat);
       return;
     }
     if (amount == null) {
-      setState(() => _error = 'Please type how much, for example 1.5.');
+      setState(() => _error = context.l10n.pleaseTypeHowMuch);
       return;
     }
     Navigator.pop(context, _LineEdit(name: name, amount: amount, unit: _unit));
@@ -669,7 +670,7 @@ class _LineSheetState extends State<_LineSheet> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Text(editing ? 'Fix this item' : 'Type an item', style: context.text.titleLarge),
+            Text(editing ? context.l10n.sheetFixTitle : context.l10n.sheetTypeTitle, style: context.text.titleLarge),
             const SizedBox(height: Space.m),
             TextField(
               key: const Key('line-name'),
@@ -677,7 +678,7 @@ class _LineSheetState extends State<_LineSheet> {
               autofocus: !editing,
               textCapitalization: TextCapitalization.words,
               textInputAction: TextInputAction.next,
-              decoration: const InputDecoration(labelText: 'Item', hintText: 'For example: Chicken'),
+              decoration: InputDecoration(labelText: context.l10n.fieldItem, hintText: context.l10n.fieldItemHint),
             ),
             const SizedBox(height: Space.m),
             Row(
@@ -690,7 +691,7 @@ class _LineSheetState extends State<_LineSheet> {
                     controller: _amount,
                     autofocus: editing,
                     keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                    decoration: const InputDecoration(labelText: 'How much', hintText: '1.5'),
+                    decoration: InputDecoration(labelText: context.l10n.fieldHowMuch, hintText: '1.5'),
                     onSubmitted: (_) => _done(),
                   ),
                 ),
@@ -700,8 +701,8 @@ class _LineSheetState extends State<_LineSheet> {
                   child: DropdownButtonFormField<String>(
                     key: const Key('line-unit'),
                     initialValue: _unit,
-                    decoration: const InputDecoration(labelText: 'Unit'),
-                    items: [for (final u in groceryUnits) DropdownMenuItem(value: u, child: Text(u))],
+                    decoration: InputDecoration(labelText: context.l10n.fieldUnit),
+                    items: [for (final u in groceryUnits) DropdownMenuItem(value: u, child: Text(context.l10n.unit(u)))],
                     onChanged: (u) => setState(() => _unit = u ?? _unit),
                   ),
                 ),
@@ -712,10 +713,10 @@ class _LineSheetState extends State<_LineSheet> {
               _Banner(message: _error!, error: true),
             ],
             const SizedBox(height: Space.m),
-            AppButton(label: editing ? 'Done' : 'Add to list', icon: Icons.add_rounded, onPressed: _done),
+            AppButton(label: editing ? context.l10n.done : context.l10n.addToList, icon: Icons.add_rounded, onPressed: _done),
             if (editing)
               AppButton(
-                label: 'Remove from list',
+                label: context.l10n.removeFromList,
                 kind: AppButtonKind.text,
                 onPressed: () => Navigator.pop(
                   context,

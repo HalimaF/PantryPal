@@ -2,9 +2,11 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
+import '../l10n/app_localizations.dart';
 import '../models/family_profile.dart';
 import '../ui/app_card.dart';
 import '../ui/context_ext.dart';
+import '../ui/labels.dart';
 import '../ui/haptics.dart';
 import '../ui/skeleton.dart';
 import '../ui/status_chip.dart';
@@ -26,11 +28,11 @@ class ProfileScreen extends StatefulWidget {
 enum _Saving { saved, saving, offline, failed }
 
 const _spiceLevels = ['Mild', 'Medium', 'Hot'];
-const _spiceHelp = {
-  'Mild': 'Mild skips hot dishes and favours gentle ones.',
-  'Medium': 'Medium shows most dishes and skips very hot ones.',
-  'Hot': 'Hot shows everything, including the spiciest dishes.',
-};
+String _spiceHelp(AppLocalizations l10n, String level) => switch (level) {
+      'Mild' => l10n.spiceHelpMild,
+      'Hot' => l10n.spiceHelpHot,
+      _ => l10n.spiceHelpMedium,
+    };
 
 class _ProfileScreenState extends State<ProfileScreen> {
   final _habits = TextEditingController();
@@ -141,7 +143,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
             children: [
               Row(
                 children: [
-                  Expanded(child: Text('Family', style: text.headlineMedium)),
+                  Expanded(child: Text(context.l10n.familyTitle, style: text.headlineMedium)),
                   _SaveChip(state: _state, onRetry: _save),
                 ],
               ),
@@ -153,13 +155,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text('Who eats at home', style: text.titleLarge),
+                      Text(context.l10n.whoEats, style: text.titleLarge),
                       const SizedBox(height: Space.m),
                       Row(
                         children: [
                           Expanded(
                             child: _CountStepper(
-                              label: 'Adults',
+                              label: context.l10n.adults,
                               value: _adults,
                               onLess: () => _setCount(child: false, delta: -1),
                               onMore: () => _setCount(child: false, delta: 1),
@@ -168,7 +170,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           const SizedBox(width: Space.m),
                           Expanded(
                             child: _CountStepper(
-                              label: 'Children under 12',
+                              label: context.l10n.childrenUnder12,
                               value: _children,
                               onLess: () => _setCount(child: true, delta: -1),
                               onMore: () => _setCount(child: true, delta: 1),
@@ -186,7 +188,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text('Favourite cuisines', style: text.titleLarge),
+                      Text(context.l10n.favCuisines, style: text.titleLarge),
                       const SizedBox(height: Space.m),
                       Wrap(
                         spacing: Space.s,
@@ -195,6 +197,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           for (final cuisine in profileCuisines)
                             _CuisineChip(
                               label: cuisine,
+                              shown: context.l10n.option(cuisine),
                               selected: _cuisines.contains(cuisine),
                               onTap: () {
                                 Haptics.tick();
@@ -210,7 +213,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   ),
                 ),
                 const SizedBox(height: Space.m),
-                Text('Anything we should know?', style: text.titleMedium),
+                Text(context.l10n.anythingKnow, style: text.titleMedium),
                 const SizedBox(height: Space.s),
                 TextField(
                   controller: _habits,
@@ -219,7 +222,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   maxLength: 300,
                   textCapitalization: TextCapitalization.sentences,
                   onChanged: (_) => _changed(),
-                  decoration: const InputDecoration(hintText: 'For example: no mushrooms, less fried food'),
+                  decoration: InputDecoration(hintText: context.l10n.notesHint),
                 ),
                 const SizedBox(height: Space.s),
                 AppCard(
@@ -232,8 +235,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       const SizedBox(width: Space.m),
                       Expanded(
                         child: Text(
-                          'The AI only sees family size, spice level and favourite cuisines. '
-                          'It never gets names, exact ages or your email.',
+                          context.l10n.privacyCard,
                           style: text.bodySmall,
                         ),
                       ),
@@ -259,8 +261,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
       children: [
         Row(
           children: [
-            Expanded(child: Text('Spice level', style: text.titleLarge)),
-            Text(shown, style: text.titleMedium?.copyWith(color: colors.primary)),
+            Expanded(child: Text(context.l10n.spiceLevel, style: text.titleLarge)),
+            Text(context.l10n.option(shown), style: text.titleMedium?.copyWith(color: colors.primary)),
           ],
         ),
         Slider(
@@ -286,13 +288,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   for (var f = 0; f <= i; f++)
                     Icon(Icons.local_fire_department_rounded, size: 16, color: colors.primary),
                   const SizedBox(width: Space.xs),
-                  Text(_spiceLevels[i], style: text.bodySmall?.copyWith(color: colors.onSurfaceVariant)),
+                  Text(context.l10n.option(_spiceLevels[i]), style: text.bodySmall?.copyWith(color: colors.onSurfaceVariant)),
                 ],
               ),
           ],
         ),
         const SizedBox(height: Space.s),
-        Text(_spiceHelp[shown]!, style: text.bodySmall?.copyWith(color: colors.onSurfaceVariant)),
+        Text(_spiceHelp(context.l10n, shown), style: text.bodySmall?.copyWith(color: colors.onSurfaceVariant)),
       ],
     );
   }
@@ -307,16 +309,16 @@ class _SaveChip extends StatelessWidget {
   Widget build(BuildContext context) {
     switch (state) {
       case _Saving.saved:
-        return const StatusChip(label: 'Saved just now', icon: Icons.cloud_done_outlined, tone: StatusTone.success);
+        return StatusChip(label: context.l10n.savedJustNow, icon: Icons.cloud_done_outlined, tone: StatusTone.success);
       case _Saving.saving:
-        return const StatusChip(label: 'Saving…', icon: Icons.cloud_upload_outlined, tone: StatusTone.warning);
+        return StatusChip(label: context.l10n.saving, icon: Icons.cloud_upload_outlined, tone: StatusTone.warning);
       case _Saving.offline:
-        return const StatusChip(
-            label: 'Saved on your phone', icon: Icons.cloud_off_rounded, tone: StatusTone.warning);
+        return StatusChip(
+            label: context.l10n.savedOnPhone, icon: Icons.cloud_off_rounded, tone: StatusTone.warning);
       case _Saving.failed:
         return ActionChip(
           avatar: Icon(Icons.refresh_rounded, size: 18, color: context.colors.onErrorContainer),
-          label: Text('Could not save. Try again', style: TextStyle(color: context.colors.onErrorContainer)),
+          label: Text(context.l10n.couldNotSaveTry, style: TextStyle(color: context.colors.onErrorContainer)),
           backgroundColor: context.colors.errorContainer,
           onPressed: onRetry,
         );
@@ -347,7 +349,7 @@ class _CountStepper extends StatelessWidget {
           Row(
             children: [
               IconButton.outlined(
-                tooltip: 'Fewer: $label',
+                tooltip: context.l10n.lessOf(label),
                 onPressed: value > 0 ? onLess : null,
                 icon: const Icon(Icons.remove_rounded),
               ),
@@ -357,7 +359,7 @@ class _CountStepper extends StatelessWidget {
                 ),
               ),
               IconButton.filledTonal(
-                tooltip: 'More: $label',
+                tooltip: context.l10n.moreOf(label),
                 onPressed: value < 20 ? onMore : null,
                 icon: const Icon(Icons.add_rounded),
               ),
@@ -370,8 +372,9 @@ class _CountStepper extends StatelessWidget {
 }
 
 class _CuisineChip extends StatelessWidget {
-  const _CuisineChip({required this.label, required this.selected, required this.onTap});
+  const _CuisineChip({required this.label, required this.shown, required this.selected, required this.onTap});
   final String label;
+  final String shown;
   final bool selected;
   final VoidCallback onTap;
 
@@ -381,7 +384,7 @@ class _CuisineChip extends StatelessWidget {
     return Semantics(
       button: true,
       selected: selected,
-      label: label,
+      label: shown,
       excludeSemantics: true,
       onTap: onTap,
       child: Material(
@@ -404,7 +407,7 @@ class _CuisineChip extends StatelessWidget {
                     Icon(Icons.check_rounded, size: 18, color: colors.onPrimaryContainer),
                     const SizedBox(width: Space.xs),
                   ],
-                  Text(label,
+                  Text(shown,
                       style: context.text.labelLarge
                           ?.copyWith(color: selected ? colors.onPrimaryContainer : colors.onSurface)),
                 ],

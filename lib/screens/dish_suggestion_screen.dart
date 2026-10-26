@@ -11,6 +11,7 @@ import '../state/cook_choices.dart';
 import '../ui/app_button.dart';
 import '../ui/app_card.dart';
 import '../ui/context_ext.dart';
+import '../ui/labels.dart';
 import '../ui/segmented_choice.dart';
 import '../ui/skeleton.dart';
 import '../ui/states.dart';
@@ -127,7 +128,7 @@ class _DishSuggestionScreenState extends State<DishSuggestionScreen> {
     final usingStock = _stock.isNotEmpty;
     final items = usingStock ? [for (final i in _stock) i.name] : splitIngredients(_ingredients.text);
     if (items.isEmpty) {
-      setState(() => _error = 'Please type a few things you have at home.');
+      setState(() => _error = context.l10n.typeSomething);
       return;
     }
     final request = SuggestRequest(
@@ -184,30 +185,33 @@ class _DishSuggestionScreenState extends State<DishSuggestionScreen> {
           child: ListView(
             padding: const EdgeInsets.fromLTRB(Space.l, Space.m, Space.l, Space.xl),
             children: [
-              Text('What to cook', style: text.headlineMedium),
+              Text(context.l10n.cookTitle, style: text.headlineMedium),
               const SizedBox(height: Space.xs),
-              Text('Best match first, using what is in your kitchen',
+              Text(context.l10n.cookSubtitle,
                   style: text.bodySmall?.copyWith(color: colors.onSurfaceVariant)),
               const SizedBox(height: Space.m),
               AppCard(
                 child: Column(
                   children: [
                     SegmentedChoice(
-                      label: 'Meal',
+                      label: context.l10n.filterMeal,
+                      labelOf: context.l10n.option,
                       options: CookChoices.meals,
                       selected: _choices.meal,
                       onSelected: (v) => _choose(_choices.copyWith(meal: v)),
                     ),
                     const SizedBox(height: Space.s),
                     SegmentedChoice(
-                      label: 'Weight',
+                      label: context.l10n.filterWeight,
+                      labelOf: context.l10n.option,
                       options: CookChoices.weights,
                       selected: _choices.weight,
                       onSelected: (v) => _choose(_choices.copyWith(weight: v)),
                     ),
                     const SizedBox(height: Space.s),
                     SegmentedChoice(
-                      label: 'With',
+                      label: context.l10n.filterWith,
+                      labelOf: context.l10n.option,
                       options: CookChoices.bases,
                       selected: _choices.base,
                       onSelected: (v) => _choose(_choices.copyWith(base: v)),
@@ -221,7 +225,7 @@ class _DishSuggestionScreenState extends State<DishSuggestionScreen> {
                   Icon(Icons.info_outline_rounded, size: 16, color: colors.onSurfaceVariant),
                   const SizedBox(width: Space.xs),
                   Expanded(
-                    child: Text('Dishes cooked in the last 7 days are hidden.',
+                    child: Text(context.l10n.hiddenRecent,
                         style: text.bodySmall?.copyWith(color: colors.onSurfaceVariant)),
                   ),
                 ],
@@ -241,20 +245,20 @@ class _DishSuggestionScreenState extends State<DishSuggestionScreen> {
 
     final asking = <Widget>[
       if (_stock.isEmpty) ...[
-        Text('What do you have at home?', style: text.titleMedium),
+        Text(context.l10n.whatHaveHome, style: text.titleMedium),
         const SizedBox(height: Space.s),
         TextField(
           controller: _ingredients,
           minLines: 3,
           maxLines: 5,
           textCapitalization: TextCapitalization.sentences,
-          decoration: const InputDecoration(
-            hintText: 'For example: chicken, onion, rice, yogurt',
-            helperText: 'Separate with commas',
+          decoration: InputDecoration(
+            hintText: context.l10n.hintIngredients,
+            helperText: context.l10n.helperCommas,
           ),
         ),
         const SizedBox(height: Space.m),
-        AppButton(label: 'Show me dishes', icon: Icons.restaurant_menu_rounded, onPressed: _loading ? null : _ask),
+        AppButton(label: context.l10n.showDishes, icon: Icons.restaurant_menu_rounded, onPressed: _loading ? null : _ask),
         const SizedBox(height: Space.m),
       ],
     ];
@@ -299,7 +303,7 @@ class _DishSuggestionScreenState extends State<DishSuggestionScreen> {
         const SizedBox(height: Space.m),
       ],
       AppButton(
-        label: 'Show different dishes',
+        label: context.l10n.showDifferent,
         icon: Icons.refresh_rounded,
         kind: AppButtonKind.secondary,
         onPressed: () => _ask(more: true),
@@ -358,7 +362,7 @@ class _DishCard extends StatelessWidget {
                           const SizedBox(width: Space.xs),
                           Expanded(
                             child: Text(
-                              all ? 'You have all ${main.length}' : 'You have $haveCount of ${main.length}',
+                              all ? context.l10n.youHaveAll(main.length) : context.l10n.youHaveOf(haveCount, main.length),
                               style: text.labelMedium?.copyWith(
                                 color: all ? colors.secondary : context.appColors.warning,
                               ),
@@ -378,7 +382,7 @@ class _DishCard extends StatelessWidget {
                       if (missing.isNotEmpty) ...[
                         const SizedBox(height: Space.s),
                         StatusChip(
-                          label: 'Missing: ${missing.join(', ')}',
+                          label: context.l10n.missingNames(missing.join(', ')),
                           icon: Icons.warning_amber_rounded,
                           tone: StatusTone.warning,
                         ),
@@ -386,7 +390,7 @@ class _DishCard extends StatelessWidget {
                     ],
                     if (best) ...[
                       const SizedBox(height: Space.s),
-                      const StatusChip(label: 'Best match', icon: Icons.star_rounded, tone: StatusTone.info),
+                      StatusChip(label: context.l10n.bestMatch, icon: Icons.star_rounded, tone: StatusTone.info),
                     ],
                   ],
                 ),
@@ -397,10 +401,10 @@ class _DishCard extends StatelessWidget {
           Row(
             children: [
               Expanded(
-                child: AppButton(label: 'Recipe', kind: AppButtonKind.secondary, onPressed: onOpen),
+                child: AppButton(label: context.l10n.btnRecipe, kind: AppButtonKind.secondary, onPressed: onOpen),
               ),
               const SizedBox(width: Space.s),
-              Expanded(child: AppButton(label: 'Cook this', onPressed: onOpen)),
+              Expanded(child: AppButton(label: context.l10n.btnCookThis, onPressed: onOpen)),
             ],
           ),
         ],
@@ -430,7 +434,7 @@ class _Thumb extends StatelessWidget {
           ),
           const SizedBox(height: Space.xs),
           StatusChip(
-            label: fromBook ? 'Recipe book' : 'AI suggestion',
+            label: fromBook ? context.l10n.recipeBook : context.l10n.aiSuggestion,
             icon: fromBook ? Icons.menu_book_rounded : Icons.auto_awesome_rounded,
             tone: fromBook ? StatusTone.info : StatusTone.neutral,
           ),

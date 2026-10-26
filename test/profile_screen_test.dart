@@ -71,9 +71,9 @@ void main() {
     final saved = await _open(tester);
     expect(find.text('Save'), findsNothing);
 
-    await tester.tap(find.byTooltip('More: Adults'));
-    await tester.tap(find.byTooltip('More: Adults'));
-    await tester.tap(find.byTooltip('More: Children under 12'));
+    await tester.tap(find.byTooltip('More Adults'));
+    await tester.tap(find.byTooltip('More Adults'));
+    await tester.tap(find.byTooltip('More Children under 12'));
     await tester.pump();
     expect(find.text('Saving…'), findsOneWidget);
     await _waitForSave(tester);
@@ -94,7 +94,7 @@ void main() {
   testWidgets('removing a child keeps the adults and the other child', (tester) async {
     final saved = await _open(tester, load: Future.value(_saved));
 
-    await tester.tap(find.byTooltip('Fewer: Children under 12'));
+    await tester.tap(find.byTooltip('Less Children under 12'));
     await _waitForSave(tester);
 
     expect(saved.single.people.map((p) => p.age), [38, 9]);
@@ -103,7 +103,7 @@ void main() {
   testWidgets('the saved country is kept even though there is no box for it', (tester) async {
     final saved = await _open(tester, load: Future.value(_saved));
 
-    await tester.tap(find.byTooltip('More: Adults'));
+    await tester.tap(find.byTooltip('More Adults'));
     await _waitForSave(tester);
 
     expect(saved.single.country, 'Pakistan');
@@ -161,7 +161,7 @@ void main() {
       saved.add(p);
     });
 
-    await tester.tap(find.byTooltip('More: Adults'));
+    await tester.tap(find.byTooltip('More Adults'));
     await _waitForSave(tester);
     expect(find.text('Could not save. Try again'), findsOneWidget);
 
@@ -177,7 +177,7 @@ void main() {
   testWidgets('with no internet it says the change is kept on the phone', (tester) async {
     await _open(tester, onSave: (_) => Completer<void>().future); // never answers
 
-    await tester.tap(find.byTooltip('More: Adults'));
+    await tester.tap(find.byTooltip('More Adults'));
     await tester.pump(const Duration(milliseconds: 700));
     await tester.pump(const Duration(seconds: 9));
 
@@ -187,7 +187,7 @@ void main() {
   testWidgets('a change made just before leaving the tab is still saved', (tester) async {
     final saved = await _open(tester);
 
-    await tester.tap(find.byTooltip('More: Adults'));
+    await tester.tap(find.byTooltip('More Adults'));
     await tester.pump();
     await tester.pumpWidget(const SizedBox()); // leave before the moment has passed
 

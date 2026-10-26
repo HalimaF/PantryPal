@@ -4,7 +4,9 @@ import 'package:flutter/material.dart';
 import '../ui/app_card.dart';
 import '../ui/app_snackbar.dart';
 import '../ui/confirm_dialog.dart';
+import '../state/app_locale.dart';
 import '../ui/context_ext.dart';
+import '../ui/segmented_choice.dart';
 import '../ui/section_header.dart';
 import '../ui/tokens.dart';
 
@@ -22,12 +24,12 @@ class SettingsScreen extends StatelessWidget {
     final name = await showDialog<String>(
       context: context,
       builder: (dialogContext) => AlertDialog(
-        title: const Text('What should we call you?'),
+        title: Text(context.l10n.askNameTitle),
         content: TextField(
           controller: controller,
           autofocus: true,
           textCapitalization: TextCapitalization.words,
-          decoration: const InputDecoration(labelText: 'Your name'),
+          decoration: InputDecoration(labelText: context.l10n.askNameLabel),
         ),
         actions: [
           TextButton(onPressed: () => Navigator.pop(dialogContext), child: Text(context.l10n.cancel)),
@@ -40,15 +42,15 @@ class SettingsScreen extends StatelessWidget {
     );
     if (name == null || name.isEmpty) return;
     await user.updateDisplayName(name);
-    if (context.mounted) AppSnackbar.show(context, 'Name saved');
+    if (context.mounted) AppSnackbar.show(context, context.l10n.nameSaved);
   }
 
   Future<void> _signOut(BuildContext context) async {
     final ok = await confirmAction(
       context,
-      title: 'Log out?',
-      message: 'Your groceries and family details stay saved. Log in again any time.',
-      confirmLabel: 'Log out',
+      title: context.l10n.logOutQ,
+      message: context.l10n.logOutBody,
+      confirmLabel: context.l10n.logOut,
       destructive: false,
     );
     if (!ok) return;
@@ -60,7 +62,7 @@ class SettingsScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final name = user.displayName?.trim() ?? '';
     return Scaffold(
-      appBar: AppBar(title: const Text('Settings')),
+      appBar: AppBar(title: Text(context.l10n.settingsTitle)),
       body: SafeArea(
         child: Center(
           child: ConstrainedBox(
@@ -68,7 +70,7 @@ class SettingsScreen extends StatelessWidget {
             child: ListView(
               padding: const EdgeInsets.all(Space.l),
               children: [
-                const SectionHeader('Account'),
+                SectionHeader(context.l10n.account),
                 const SizedBox(height: Space.s),
                 AppCard(
                   padding: EdgeInsets.zero,
@@ -76,18 +78,33 @@ class SettingsScreen extends StatelessWidget {
                     children: [
                       _Row(
                         icon: Icons.person_outline_rounded,
-                        title: 'Name',
-                        value: name.isEmpty ? 'Not set' : name,
+                        title: context.l10n.nameLabel,
+                        value: name.isEmpty ? context.l10n.notSet : name,
                         onTap: () => _rename(context),
                         trailing: Icons.edit_outlined,
                       ),
                       const Divider(),
-                      _Row(icon: Icons.email_outlined, title: 'Email', value: user.email ?? ''),
+                      _Row(icon: Icons.email_outlined, title: context.l10n.emailLabel, value: user.email ?? ''),
                     ],
                   ),
                 ),
                 const SizedBox(height: Space.l),
-                const SectionHeader('Privacy'),
+                SectionHeader(context.l10n.language),
+                const SizedBox(height: Space.s),
+                AppCard(
+                  child: ValueListenableBuilder<Locale>(
+                    valueListenable: appLocale,
+                    builder: (context, locale, _) => SegmentedChoice(
+                      label: '',
+                      options: const ['en', 'ur'],
+                      selected: locale.languageCode,
+                      labelOf: (code) => code == 'ur' ? context.l10n.languageUrdu : context.l10n.languageEnglish,
+                      onSelected: (code) => setAppLocale(Locale(code)),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: Space.l),
+                SectionHeader(context.l10n.privacy),
                 const SizedBox(height: Space.s),
                 AppCard(
                   child: Row(
@@ -97,8 +114,7 @@ class SettingsScreen extends StatelessWidget {
                       const SizedBox(width: Space.m),
                       Expanded(
                         child: Text(
-                          'Your groceries and family details are private to your account. The AI only sees '
-                          'family size, spice level and favourite cuisines. It never gets names, exact ages or your email.',
+                          context.l10n.privacyBody,
                           style: context.text.bodyMedium,
                         ),
                       ),
@@ -106,18 +122,18 @@ class SettingsScreen extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: Space.l),
-                const SectionHeader('About'),
+                SectionHeader(context.l10n.about),
                 const SizedBox(height: Space.s),
                 AppCard(
                   padding: EdgeInsets.zero,
                   child: Column(
-                    children: const [
-                      _Row(icon: Icons.soup_kitchen_rounded, title: 'Pantry Pal', value: 'Dish ideas from what is at home'),
-                      Divider(),
+                    children: [
+                      _Row(icon: Icons.soup_kitchen_rounded, title: context.l10n.appName, value: context.l10n.aboutTag),
+                      const Divider(),
                       _Row(
                         icon: Icons.info_outline_rounded,
-                        title: 'Amounts and dishes',
-                        value: 'Amounts are approximate. Dish ideas are suggestions, not guarantees.',
+                        title: context.l10n.amountsDishes,
+                        value: context.l10n.aboutNote,
                       ),
                     ],
                   ),
@@ -126,7 +142,7 @@ class SettingsScreen extends StatelessWidget {
                 OutlinedButton.icon(
                   onPressed: () => _signOut(context),
                   icon: const Icon(Icons.logout_rounded),
-                  label: const Text('Log out'),
+                  label: Text(context.l10n.logOut),
                 ),
               ],
             ),

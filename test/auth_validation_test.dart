@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:what_can_i_cook/screens/auth_screen.dart';
-import 'package:what_can_i_cook/theme.dart';
+
+import 'helpers/test_app.dart';
 
 // These only cover what the login screen checks before it talks to Firebase, so they need no
 // account and no internet.
@@ -9,10 +10,7 @@ Future<void> _open(WidgetTester tester) async {
   tester.view.physicalSize = const Size(900, 2400);
   tester.view.devicePixelRatio = 1;
   addTearDown(tester.view.reset);
-  await tester.pumpWidget(MaterialApp(
-    theme: buildTheme(useWebFonts: false),
-    home: const AuthScreen(),
-  ));
+  await tester.pumpWidget(testApp(const AuthScreen()));
   await tester.pumpAndSettle();
 }
 
