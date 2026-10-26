@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import '../logic/days_left.dart';
+import '../logic/item_matching.dart';
 import '../models/inventory_item.dart';
 import '../services/data_service.dart';
 import '../services/gemini_service.dart';
@@ -177,10 +178,13 @@ class _AddGroceriesScreenState extends State<AddGroceriesScreen> {
       _error = null;
     });
     var savedOffline = false;
+    var results = const <AddResult>[];
     try {
       // With no internet the phone keeps the change and sends it later, so do not wait forever.
       await Future.wait([
-        for (final i in items) widget.data.addItem(name: i.name, amount: i.amount, unit: i.unit),
+        widget.data
+            .addItems([for (final i in items) NewItem(name: i.name, amount: i.amount, unit: i.unit)])
+            .then((r) => results = r),
         widget.data.saveShoppingDates(last: _shopped, next: _next),
       ]).timeout(const Duration(seconds: 8));
     } on TimeoutException {
@@ -197,16 +201,31 @@ class _AddGroceriesScreenState extends State<AddGroceriesScreen> {
     if (!mounted) return;
     onSaved();
     setState(() => _busy = false);
-    final one = items.first;
     ScaffoldMessenger.of(context)
       ..hideCurrentSnackBar()
-      ..showSnackBar(SnackBar(
-        content: Text(savedOffline
-            ? 'Saved on your phone. It will sync when you are online.'
-            : items.length == 1
-                ? 'Added ${one.name}, ${formatAmount(one.amount)} ${one.unit}.'
-                : 'Added ${items.length} items.'),
-      ));
+      ..showSnackBar(SnackBar(content: Text(_savedMessage(items, results, savedOffline))));
+  }
+
+  /// What she is told after saving. When something was already in her kitchen, she is told its
+  /// amount went up, so a second pack never looks like it was lost or duplicated.
+  String _savedMessage(
+    List<({String name, double amount, String unit})> items,
+    List<AddResult> results,
+    bool savedOffline,
+  ) {
+    if (savedOffline) return 'Saved on your phone. It will sync when you are online.';
+    final raised = results.where((r) => r.merged).toList();
+    if (items.length == 1) {
+      if (raised.length == 1) {
+        final r = raised.single;
+        return '${r.name} was already in your kitchen, so now you have ${formatAmount(r.newTotal)} ${r.unit}.';
+      }
+      final one = items.first;
+      return 'Added ${one.name}, ${formatAmount(one.amount)} ${one.unit}.';
+    }
+    if (raised.isEmpty) return 'Added ${items.length} items.';
+    final names = raised.map((r) => r.name).toSet().join(', ');
+    return 'Added ${items.length} items. $names ${raised.length == 1 ? 'was' : 'were'} already in your kitchen, so the amount went up.';
   }
 
   void _clearPhoto() {

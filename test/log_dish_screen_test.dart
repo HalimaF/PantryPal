@@ -1,10 +1,13 @@
 import 'dart:async';
+import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:what_can_i_cook/models/inventory_item.dart';
 import 'package:what_can_i_cook/models/meal.dart';
 import 'package:what_can_i_cook/screens/log_dish_screen.dart';
+import 'package:what_can_i_cook/services/gemini_service.dart';
+import 'package:what_can_i_cook/services/photo_picker.dart';
 import 'package:what_can_i_cook/theme.dart';
 
 const _stock = [
@@ -20,6 +23,8 @@ Future<List<LogMealRequest>> _open(
   String dishName = '',
   List<String> dishIngredients = const [],
   Future<void> Function(LogMealRequest)? onSave,
+  GenerateImage? generateImage,
+  PhotoPicker? pickPhoto,
   bool settle = true, // a spinner never finishes animating, so some tests step time by hand
 }) async {
   tester.view.physicalSize = const Size(900, 2600);
@@ -38,6 +43,10 @@ Future<List<LogMealRequest>> _open(
                 onSave: onSave ?? (r) async => saved.add(r),
                 dishName: dishName,
                 dishIngredients: dishIngredients,
+                pickPhoto: pickPhoto ?? (_) async => PickedPhoto(Uint8List.fromList([1, 2, 3]), 'image/jpeg'),
+                gemini: GeminiService(
+                  generateImage: generateImage ?? (_, _, _, _) async => '{"used":[]}',
+                ),
               ),
             )),
             child: const Text('open'),
@@ -141,5 +150,72 @@ void main() {
     await tester.pump();
 
     expect(find.textContaining('You have no groceries saved'), findsOneWidget);
+  });
+
+  testWidgets('a photo of the dish fills in a guess, which she can still change', (tester) async {
+    final saved = await _open(
+      tester,
+      dishName: 'Chicken Pulao',
+      generateImage: (prompt, _, _, _) async {
+        expect(prompt, contains('Chicken Pulao'));
+        return '{"used":[{"name":"Chicken","amount":0.75},{"name":"Rice","amount":1}]}';
+      },
+    );
+
+    await tester.tap(find.text('Photo of the dish'));
+    await tester.pumpAndSettle();
+
+    expect(find.textContaining('I guessed these amounts from your photo'), findsOneWidget);
+    final fields = find.byType(TextField);
+    // name, then Chicken, Eggs, Rice
+    expect(tester.widget<TextField>(fields.at(1)).controller!.text, '0.75');
+    expect(tester.widget<TextField>(fields.at(2)).controller!.text, isEmpty);
+    expect(tester.widget<TextField>(fields.at(3)).controller!.text, '1');
+
+    await tester.enterText(fields.at(1), '0.5'); // she corrects the chicken
+    await tester.ensureVisible(find.text('Save to my log'));
+    await tester.tap(find.text('Save to my log'));
+    await tester.pumpAndSettle();
+
+    final byName = {for (final u in saved.single.used) u.name: u.amount};
+    expect(byName, {'Chicken': 0.5, 'Rice': 1.0});
+  });
+
+  testWidgets('when the amounts cannot be worked out, she is asked to type them', (tester) async {
+    await _open(tester, dishName: 'Daal');
+
+    await tester.tap(find.text('Photo of the dish'));
+    await tester.pumpAndSettle();
+
+    expect(find.textContaining('I could not work out the amounts'), findsOneWidget);
+  });
+
+  testWidgets('when the photo cannot be read at all, she is asked to type the amounts', (tester) async {
+    await _open(
+      tester,
+      dishName: 'Daal',
+      generateImage: (_, _, _, _) async => throw GeminiException('busy'),
+    );
+
+    await tester.tap(find.text('Photo of the dish'));
+    await tester.pumpAndSettle();
+
+    expect(find.textContaining('I could not read that photo'), findsOneWidget);
+  });
+
+  testWidgets('backing out of the camera changes nothing', (tester) async {
+    await _open(tester, dishName: 'Daal', pickPhoto: (_) async => null);
+
+    await tester.tap(find.text('Photo of the dish'));
+    await tester.pumpAndSettle();
+
+    expect(find.textContaining('I guessed'), findsNothing);
+    expect(find.textContaining('I could not'), findsNothing);
+  });
+
+  testWidgets('no photo buttons when there are no groceries to estimate', (tester) async {
+    await _open(tester, stock: Future.value(const <InventoryItem>[]), dishName: 'Daal');
+
+    expect(find.text('Photo of the dish'), findsNothing);
   });
 }

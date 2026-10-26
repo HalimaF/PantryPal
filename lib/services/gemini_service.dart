@@ -35,6 +35,14 @@ typedef GenerateImage = Future<String> Function(
 /// page with image input; the other is the backup (spec.md > Stack).
 const geminiImageModels = ['gemini-3.5-flash-lite', 'gemini-3.8-flash'];
 
+/// How much of one grocery item Gemini thinks went into a dish.
+class UsedEstimate {
+  const UsedEstimate({required this.itemId, required this.amount});
+
+  final String itemId; // the inventory document
+  final double amount; // in the item's own unit
+}
+
 /// All AI calls live here. Implements spec.md > Components > Gemini service.
 class GeminiService {
   GeminiService({Generate? generate, GenerateImage? generateImage})
@@ -43,6 +51,23 @@ class GeminiService {
 
   final Generate _generate;
   final GenerateImage _generateImage;
+
+  /// A rough guess of how much of each grocery item went into the dish in the photo.
+  /// Only items she has are returned, never more than is left. Implements prd.md > Log today's dish.
+  Future<List<UsedEstimate>> estimateUsed(
+    Uint8List photo,
+    String mimeType, {
+    required String dishName,
+    required List<InventoryItem> stock,
+  }) async {
+    final text = await _generateImage(
+      buildEstimatePrompt(dishName, stock),
+      _estimateSchema,
+      photo,
+      mimeType,
+    );
+    return parseUsedEstimates(text, stock);
+  }
 
   /// Every grocery item in a photo: its name (with the brand if visible) and how much the
   /// packaging shows. Empty when it cannot tell what anything is.
@@ -83,6 +108,15 @@ final _identifySchema = Schema.object(properties: {
       },
       optionalProperties: ['amount', 'unit'],
     ),
+  ),
+});
+
+final _estimateSchema = Schema.object(properties: {
+  'used': Schema.array(
+    items: Schema.object(properties: {
+      'name': Schema.string(),
+      'amount': Schema.number(),
+    }),
   ),
 });
 
@@ -178,6 +212,18 @@ For each item give:
 Allowed units: kg, g, L, ml, pieces, packs.
 If you cannot tell what anything is, return an empty list.''';
 
+String buildEstimatePrompt(String dishName, List<InventoryItem> stock) {
+  final dish = dishName.trim().isEmpty ? 'a home-cooked dish' : '"${dishName.trim()}"';
+  final have = [
+    for (final i in stock) '${i.name} (${formatAmount(i.amount)} ${i.unit} left)',
+  ].join('; ');
+  return '''
+This is a photo of $dish cooked in a home kitchen, likely in an Asian household.
+Estimate roughly how much of each grocery item below was used to make everything you can see in the photo.
+Only use items from this list, and give each amount in that item's own unit: $have.
+Leave out items that were not used. Never give more than what is left. If you cannot tell, return an empty list.''';
+}
+
 String buildSuggestPrompt(SuggestRequest r) {
   final items = r.stockDetails.isNotEmpty ? r.stockDetails : r.ingredients;
   final have = items.isEmpty ? 'not specified' : items.join(', ');
@@ -249,6 +295,28 @@ List<IdentifiedItem> parseIdentifiedItems(String text) {
     return found;
   } on Object {
     throw GeminiException('We could not read the photo. Please type what it is.');
+  }
+}
+
+/// Gemini's guesses, matched to her groceries by name. Names she does not have are ignored, and
+/// an amount is never more than what is left or less than nothing.
+List<UsedEstimate> parseUsedEstimates(String text, List<InventoryItem> stock) {
+  try {
+    final data = jsonDecode(text) as Map<String, dynamic>;
+    final byName = {for (final i in stock) i.name.trim().toLowerCase(): i};
+    final out = <UsedEstimate>[];
+    final seen = <String>{};
+    for (final raw in data['used'] as List) {
+      if (raw is! Map) continue;
+      final item = byName[(raw['name'] as String? ?? '').trim().toLowerCase()];
+      final amount = raw['amount'];
+      if (item == null || amount is! num || amount <= 0 || !seen.add(item.id)) continue;
+      final capped = amount.toDouble() > item.amount ? item.amount : amount.toDouble();
+      out.add(UsedEstimate(itemId: item.id, amount: capped));
+    }
+    return out;
+  } on Object {
+    throw GeminiException('We could not work out the amounts. Please type them.');
   }
 }
 

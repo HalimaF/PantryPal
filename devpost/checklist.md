@@ -89,7 +89,7 @@ Build mode: learn
   Learner check: Photograph a bag of rice or some chicken and say whether the name is right and the correction option works.
   Commit: `Add grocery entry by photo`
 
-- [ ] **8. Estimate used amounts from a photo, then firm up the app**
+- [x] **8. Estimate used amounts from a photo, then firm up the app**
   Becomes usable: When logging a dish, optionally send a photo and get estimated amounts to adjust; Firestore rules limit each user to their own data; the release APK builds for the family.
   Why now: Photo estimation is the last and most trimmable feature, and the rules and APK are what make it safe and shareable.
   PRD ref: `prd.md > Features and Behavior > Log today's dish`
@@ -134,3 +134,5 @@ Activity mode: not started
 - Suggestions now read the groceries once with a direct read instead of re-listening to Home's live feed, and fall back to the text box after 8 seconds — a second listener on an already-open Firestore feed never receives the current list, which left the screen waiting forever.
 - Photos now also read the quantity and keep the brand, and fill in the amount and unit — the learner photographed 1 litre of milk and wanted "Shan Chaat Masala" saved with its brand and one pack counted as 1 pack, while the first version only returned a plain name. `spec.md > Components > Gemini service` `identifyItem` now returns name, amount and unit.
 - A photo can now contain several items: Gemini returns a list, and the Add groceries page shows each one to tick, correct and add together — the learner photographed more than one item and only one was recognised. `identifyItem` became `identifyItems` in `spec.md > Components > Gemini service`.
+- Slice 8 added a photo of the dish to estimate used amounts, a README, and the release APK; the Firestore rules were already deployed during slice 2 and were re-checked here (every request without a login returned 403 for reads, writes and anything outside `users/`).
+- Adding something she already has now raises the existing line instead of making a second one, even when Gemini spells it a little differently or uses a related unit (pack/piece, g/kg, ml/L) — the learner photographed two packs of the same product separately and got two entries. `DataService.addItem` became `addItems`, which matches against her current groceries (`lib/logic/item_matching.dart`).

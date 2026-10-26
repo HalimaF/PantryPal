@@ -3,6 +3,7 @@ import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:what_can_i_cook/logic/item_matching.dart';
 import 'package:what_can_i_cook/models/inventory_item.dart';
 import 'package:what_can_i_cook/screens/add_groceries_screen.dart';
 import 'package:what_can_i_cook/services/data_service.dart';
@@ -25,9 +26,15 @@ class _FakeData extends DataService {
   Stream<ShoppingDates> shoppingDates() =>
       Stream<ShoppingDates>.multi((c) => c.add(const ShoppingDates()));
 
+  /// What she already has, so a second pack can be matched to it like the real thing does.
+  List<InventoryItem> existing = [];
+
   @override
-  Future<void> addItem({required String name, required double amount, required String unit}) async {
-    added.add((name: name, amount: amount, unit: unit));
+  Future<List<AddResult>> addItems(List<NewItem> items) async {
+    for (final i in items) {
+      added.add((name: i.name, amount: i.amount, unit: i.unit));
+    }
+    return planAdds(existing, items);
   }
 
   @override
@@ -227,6 +234,45 @@ void main() {
     await tester.tap(find.text('Add to my groceries'));
     await tester.pumpAndSettle();
     expect(data.added.single.name, 'Rice');
+  });
+
+  testWidgets('a second pack of the same product raises the amount and says so', (tester) async {
+    final data = await _open(
+      tester,
+      // Gemini spelled it differently this time.
+      generateImage: (_, _, _, _) async =>
+          _found(['{"name":"Shan Chat Masala","amount":1,"unit":"packs"}']),
+    );
+    data.existing = const [
+      InventoryItem(id: 'shan', name: 'Shan Chaat Masala', amount: 1, unit: 'packs'),
+    ];
+
+    await _takePhoto(tester);
+    await tester.ensureVisible(find.text('Add 1 item'));
+    await tester.tap(find.text('Add 1 item'));
+    await tester.pump();
+
+    expect(
+      find.text('Shan Chaat Masala was already in your kitchen, so now you have 2 packs.'),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('a different brand is a new line, not added to the first', (tester) async {
+    final data = await _open(
+      tester,
+      generateImage: (_, _, _, _) async => _found([_national]),
+    );
+    data.existing = const [
+      InventoryItem(id: 'shan', name: 'Shan Chaat Masala', amount: 1, unit: 'packs'),
+    ];
+
+    await _takePhoto(tester);
+    await tester.ensureVisible(find.text('Add 1 item'));
+    await tester.tap(find.text('Add 1 item'));
+    await tester.pump();
+
+    expect(find.text('Added National Chaat Masala, 1 packs.'), findsOneWidget);
   });
 
   testWidgets('a second photo replaces the first list', (tester) async {

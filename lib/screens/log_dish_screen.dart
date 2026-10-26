@@ -4,7 +4,9 @@ import 'package:flutter/material.dart';
 
 import '../models/inventory_item.dart';
 import '../models/meal.dart';
+import '../services/gemini_service.dart';
 import '../services/ingredient_matcher.dart';
+import '../services/photo_picker.dart';
 import '../theme.dart';
 
 /// Say what you cooked and how much of each thing went in. Implements prd.md > Features and
@@ -17,6 +19,8 @@ class LogDishScreen extends StatefulWidget {
     this.dishName = '',
     this.dishIngredients = const [],
     this.slot = 'Dinner',
+    this.gemini,
+    this.pickPhoto,
   });
 
   /// Her groceries, read once. Handed in so the screen can be tested without Firebase.
@@ -28,6 +32,10 @@ class LogDishScreen extends StatefulWidget {
   final String dishName;
   final List<String> dishIngredients; // main ingredients of the dish, to put those first
   final String slot;
+  final GeminiService? gemini;
+
+  /// Opens the camera or gallery. Replaceable in tests.
+  final PhotoPicker? pickPhoto;
 
   @override
   State<LogDishScreen> createState() => _LogDishScreenState();
@@ -37,6 +45,11 @@ class _LogDishScreenState extends State<LogDishScreen> {
   late final TextEditingController _name = TextEditingController(text: widget.dishName);
   final Map<String, TextEditingController> _amounts = {};
   late String _slot = widget.slot == 'Lunch' ? 'Lunch' : 'Dinner';
+
+  late final GeminiService _gemini = widget.gemini ?? GeminiService();
+
+  bool _estimating = false;
+  String? _estimateNote;
 
   List<InventoryItem>? _items; // null while loading
   Set<String> _inDish = {};
@@ -79,6 +92,48 @@ class _LogDishScreenState extends State<LogDishScreen> {
       c.dispose();
     }
     super.dispose();
+  }
+
+  /// Looks at a photo of the cooked dish and fills in a guess for each item. She checks it.
+  Future<void> _estimate(PhotoSource source) async {
+    final items = _items ?? const <InventoryItem>[];
+    PickedPhoto? photo;
+    try {
+      photo = await (widget.pickPhoto ?? pickPhotoFromDevice)(source);
+    } catch (_) {
+      if (mounted) setState(() => _error = 'Could not open the photos. Please type the amounts.');
+      return;
+    }
+    if (photo == null || !mounted) return; // she backed out
+    setState(() {
+      _estimating = true;
+      _error = null;
+      _estimateNote = null;
+    });
+    var guesses = const <UsedEstimate>[];
+    var failed = false;
+    try {
+      guesses = await _gemini.estimateUsed(
+        photo.bytes,
+        photo.mimeType,
+        dishName: _name.text,
+        stock: items,
+      );
+    } on GeminiException {
+      failed = true;
+    }
+    if (!mounted) return;
+    setState(() {
+      _estimating = false;
+      for (final g in guesses) {
+        _amounts[g.itemId]?.text = formatAmount(g.amount);
+      }
+      _estimateNote = guesses.isNotEmpty
+          ? 'I guessed these amounts from your photo. Please check them.'
+          : failed
+              ? 'I could not read that photo. Please type the amounts.'
+              : 'I could not work out the amounts from that photo. Please type them.';
+    });
   }
 
   Future<void> _save() async {
@@ -186,6 +241,44 @@ class _LogDishScreenState extends State<LogDishScreen> {
               'An estimate is fine. Leave blank anything you did not use.',
               style: text.bodyMedium?.copyWith(color: mutedBrown, fontSize: 15),
             ),
+            if (items != null && items.isNotEmpty) ...[
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      onPressed: _estimating ? null : () => _estimate(PhotoSource.camera),
+                      icon: const Icon(Icons.photo_camera_rounded),
+                      label: const Text('Photo of the dish'),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      onPressed: _estimating ? null : () => _estimate(PhotoSource.gallery),
+                      icon: const Icon(Icons.photo_library_rounded),
+                      label: const Text('Choose a photo'),
+                    ),
+                  ),
+                ],
+              ),
+              if (_estimating || _estimateNote != null) ...[
+                const SizedBox(height: 10),
+                _estimating
+                    ? Row(
+                        children: [
+                          const SizedBox(
+                              width: 20,
+                              height: 20,
+                              child: CircularProgressIndicator(strokeWidth: 2.5)),
+                          const SizedBox(width: 12),
+                          Text('Estimating from your photo…', style: text.bodyMedium),
+                        ],
+                      )
+                    : Text(_estimateNote!,
+                        style: text.bodyMedium?.copyWith(color: mutedBrown, fontSize: 15)),
+              ],
+            ],
             const SizedBox(height: 14),
             if (items == null)
               const Padding(

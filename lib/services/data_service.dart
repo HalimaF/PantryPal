@@ -1,8 +1,7 @@
-import 'dart:convert';
-
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 import '../logic/days_left.dart';
+import '../logic/item_matching.dart';
 import '../logic/stock_usage.dart';
 import '../models/family_profile.dart';
 import '../models/inventory_item.dart';
@@ -132,15 +131,28 @@ class DataService {
         );
       });
 
-  /// Adding "chicken 1 kg" twice gives 2 kg: one document per name and unit.
-  Future<void> addItem({required String name, required double amount, required String unit}) {
-    final clean = name.trim();
-    return _inventory.doc(_itemId(clean, unit)).set({
-      'name': clean,
-      'unit': unit,
-      'amount': FieldValue.increment(amount),
-      'addedAt': FieldValue.serverTimestamp(),
-    }, SetOptions(merge: true));
+  /// Adds items to her groceries. Something she already has (even spelled a little differently, or in
+  /// a related unit) has its amount raised instead of getting a second line. Everything is saved
+  /// in one go. Returns what happened to each item.
+  Future<List<AddResult>> addItems(List<NewItem> items) async {
+    List<InventoryItem> existing;
+    try {
+      existing = await inventoryOnce();
+    } catch (_) {
+      existing = const []; // cannot see what she has: add as new lines rather than lose the items
+    }
+    final results = planAdds(existing, items);
+    final batch = _db.batch();
+    for (final r in results) {
+      batch.set(_inventory.doc(r.docId), {
+        'name': r.name,
+        'unit': r.unit,
+        'amount': FieldValue.increment(r.added),
+        'addedAt': FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true));
+    }
+    await batch.commit();
+    return results;
   }
 
   Future<void> removeItem(String id) => _inventory.doc(id).delete();
@@ -152,9 +164,5 @@ class DataService {
       }, SetOptions(merge: true));
 }
 
-/// A safe document name for any language ("Chicken", "مرغی"), the same each time.
-String _itemId(String name, String unit) =>
-    base64Url.encode(utf8.encode('${name.toLowerCase()}|$unit')).replaceAll('=', '');
-
 /// Exposed so tests can check that the same item always lands in the same document.
-String itemIdFor(String name, String unit) => _itemId(name.trim(), unit);
+String itemIdFor(String name, String unit) => itemDocId(name.trim(), unit);
