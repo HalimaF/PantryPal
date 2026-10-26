@@ -47,7 +47,7 @@ void main() {
     testWidgets('uses her name', (tester) async {
       await _open(tester);
 
-      expect(find.textContaining(', Halima'), findsOneWidget);
+      expect(find.text('Halima'), findsOneWidget);
       expect(find.text("What's on the menu today?"), findsOneWidget);
       expect(find.text('Add your name'), findsNothing);
     });
@@ -62,9 +62,9 @@ void main() {
       await _open(tester, name: null);
 
       expect(find.text('Add your name'), findsOneWidget);
-      // just the greeting, with no ", name" after it
+      // the menu line stands in as the title, with the add-name button under it
       expect(
-        find.byWidgetPredicate((w) => w is Text && w.data == 'Assalam o Alaikum'),
+        find.byWidgetPredicate((w) => w is Text && w.data == "What's on the menu today?"),
         findsOneWidget,
       );
     });

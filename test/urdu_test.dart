@@ -77,7 +77,7 @@ void main() {
 
       expect(find.text('ہوم'), findsOneWidget); // the bottom bar
       expect(find.text('ڈش تجویز کریں'), findsOneWidget);
-      expect(find.textContaining('السلام علیکم'), findsOneWidget);
+      expect(find.text('حلیمہ'), findsOneWidget);
       expect(find.text('ابھی کوئی سامان نہیں'), findsOneWidget);
 
       await tester.tap(find.text('پکائیں'));

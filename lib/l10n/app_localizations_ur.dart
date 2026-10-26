@@ -104,9 +104,6 @@ class AppLocalizationsUr extends AppLocalizations {
   String get tabFamily => 'گھر والے';
 
   @override
-  String get homeGreeting => 'السلام علیکم';
-
-  @override
   String get homeMenuToday => 'آج کے مینو میں کیا ہے؟';
 
   @override

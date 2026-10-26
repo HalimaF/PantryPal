@@ -24,7 +24,7 @@ void main() {
   testWidgets('starts on Home with four tabs', (tester) async {
     await _open(tester);
     expect(find.byType(NavigationDestination), findsNWidgets(4));
-    expect(find.textContaining(', Halima'), findsOneWidget);
+    expect(find.text('Halima'), findsOneWidget);
   });
 
   testWidgets('each tab opens its screen and Home keeps its place', (tester) async {
@@ -44,7 +44,7 @@ void main() {
 
     await tester.tap(find.text('Home'));
     await tester.pumpAndSettle();
-    expect(find.textContaining(', Halima'), findsOneWidget);
+    expect(find.text('Halima'), findsOneWidget);
   });
 
   testWidgets('Suggest a dish on Home switches to the Cook tab', (tester) async {

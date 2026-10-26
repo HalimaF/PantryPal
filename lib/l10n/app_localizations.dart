@@ -266,12 +266,6 @@ abstract class AppLocalizations {
   /// **'Family'**
   String get tabFamily;
 
-  /// No description provided for @homeGreeting.
-  ///
-  /// In en, this message translates to:
-  /// **'Assalam o Alaikum'**
-  String get homeGreeting;
-
   /// No description provided for @homeMenuToday.
   ///
   /// In en, this message translates to:

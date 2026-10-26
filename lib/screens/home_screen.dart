@@ -136,7 +136,7 @@ class _HomeScreenState extends State<HomeScreen> {
                             style: text.bodySmall?.copyWith(color: colors.onSurfaceVariant),
                           ),
                           Text(
-                            name.isEmpty ? context.l10n.homeGreeting : '${context.l10n.homeGreeting}, $name',
+                            name.isEmpty ? context.l10n.homeMenuToday : name,
                             maxLines: 2,
                             overflow: TextOverflow.ellipsis,
                             style: text.headlineMedium,
