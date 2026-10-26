@@ -41,6 +41,11 @@ dependencies:
   image_picker: ^1.2.4
   google_fonts: ^8.2.1
   csv: ^8.0.0
+  flutter_localizations:
+    sdk: flutter
+  shared_preferences: ^2.5.6
+  wakelock_plus: ^1.8.2
+  intl: any # the exact version is chosen by flutter_localizations
 
 dev_dependencies:
   flutter_test:
@@ -61,6 +66,7 @@ dev_dependencies:
 
 # The following section is specific to Flutter packages.
 flutter:
+  generate: true # builds the translated strings in lib/l10n from the .arb files
 
   # The following line ensures that the Material Icons font is
   # included with your application, so that you can use the icons in

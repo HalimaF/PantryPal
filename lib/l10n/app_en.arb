@@ -1,0 +1,36 @@
+{
+  "@@locale": "en",
+
+  "appName": "What Can I Cook?",
+  "retry": "Try again",
+  "undo": "Undo",
+  "cancel": "Cancel",
+  "remove": "Remove",
+  "save": "Save",
+  "done": "Done",
+  "skip": "Skip",
+  "next": "Next",
+  "back": "Back",
+  "edit": "Edit",
+  "close": "Close",
+  "loading": "Loading…",
+
+  "syncPending": "Saved on this phone. It will sync when you are online.",
+  "syncPendingShort": "Waiting to sync",
+
+  "lessOf": "Less {name}",
+  "@lessOf": { "placeholders": { "name": { "type": "String" } } },
+  "moreOf": "More {name}",
+  "@moreOf": { "placeholders": { "name": { "type": "String" } } },
+  "amountOf": "{name}: {amount}",
+  "@amountOf": { "placeholders": { "name": { "type": "String" }, "amount": { "type": "String" } } },
+  "typeExactAmount": "Tap to type an exact amount",
+  "howMuchOf": "How much {name}?",
+  "@howMuchOf": { "placeholders": { "name": { "type": "String" } } },
+  "amountNeedsNumber": "Please type a number above 0.",
+  "amountTooMuch": "That is more than you have ({max}).",
+  "@amountTooMuch": { "placeholders": { "max": { "type": "String" } } },
+
+  "haveIt": "Have",
+  "missingIt": "Missing"
+}
