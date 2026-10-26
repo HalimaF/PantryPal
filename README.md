@@ -15,7 +15,7 @@ home and unsure what is left.
 - **Home dashboard.** Days until the next shopping day, what is left, and a total, so mum can judge
   for herself whether it will last.
 - **Dish suggestions.** Pick lunch or dinner, light or heavy, and rice, roti or bread. Dishes come
-  **first from the family's own recipe book** (`data/dishes.csv`, 1,003 dishes), instantly, and only
+  **first from the family's own recipe book** (`data/dishes.csv`, 3,003 dishes), instantly, and only
   from Gemini when nothing in the book fits.
 - **Cook and log.** After cooking, log the dish and how much of each ingredient was used (or take a
   photo of the dish for a rough guess). The groceries go down, and the dish is not suggested again
