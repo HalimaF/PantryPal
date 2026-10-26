@@ -1,4 +1,4 @@
-# What Can I Cook?
+# Pantry Pal
 
 An Android app that helps a homemaker answer the daily question **"what should I cook today?"** from
 what is actually in the kitchen, without repeating what the family ate this week.

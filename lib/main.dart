@@ -19,7 +19,7 @@ class WhatCanICookApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'What Can I Cook?',
+      title: 'Pantry Pal',
       theme: buildTheme(),
       debugShowCheckedModeBanner: false,
       // Firebase remembers the login, so this shows Home straight away on reopen.
