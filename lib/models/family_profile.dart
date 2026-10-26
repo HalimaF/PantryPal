@@ -88,4 +88,4 @@ class FamilyProfile {
   static String _short(String text, int max) => text.length <= max ? text : text.substring(0, max);
 }
 
-const profileCuisines = ['Pakistani', 'Indian', 'Chinese', 'Arabic', 'Continental', 'Fast food'];
+const profileCuisines = ['Pakistani', 'Chinese', 'Arabic', 'Italian', 'BBQ'];

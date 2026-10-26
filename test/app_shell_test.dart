@@ -36,7 +36,7 @@ void main() {
 
     await tester.tap(find.text('Family'));
     await tester.pumpAndSettle();
-    expect(find.text('Who are you cooking for?'), findsOneWidget);
+    expect(find.text('Who eats at home'), findsOneWidget);
 
     await tester.tap(find.text('Cook'));
     await tester.pumpAndSettle();

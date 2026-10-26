@@ -3,9 +3,15 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import '../models/family_profile.dart';
-import '../theme.dart';
+import '../ui/app_card.dart';
+import '../ui/context_ext.dart';
+import '../ui/haptics.dart';
+import '../ui/skeleton.dart';
+import '../ui/status_chip.dart';
+import '../ui/tokens.dart';
 
 /// Who mum cooks for and what they like. Implements prd.md > Features and Behavior > Profile.
+/// There is no Save button: every change is saved a moment later, and the chip at the top says so.
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key, required this.load, required this.onSave});
 
@@ -17,22 +23,29 @@ class ProfileScreen extends StatefulWidget {
   State<ProfileScreen> createState() => _ProfileScreenState();
 }
 
-class _PersonRow {
-  _PersonRow({String age = '', this.gender = 'Female'}) : age = TextEditingController(text: age);
-  final TextEditingController age;
-  String gender;
-}
+enum _Saving { saved, saving, offline, failed }
+
+const _spiceLevels = ['Mild', 'Medium', 'Hot'];
+const _spiceHelp = {
+  'Mild': 'Mild skips hot dishes and favours gentle ones.',
+  'Medium': 'Medium shows most dishes and skips very hot ones.',
+  'Hot': 'Hot shows everything, including the spiciest dishes.',
+};
 
 class _ProfileScreenState extends State<ProfileScreen> {
-  final _country = TextEditingController();
   final _habits = TextEditingController();
-  final List<_PersonRow> _people = [];
+  final List<Person> _people = [];
   final Set<String> _cuisines = {};
   String _spice = '';
+  String _country = ''; // no box for it any more, but a saved value is kept
 
   bool _loaded = false;
-  bool _busy = false;
-  String? _error;
+  _Saving _state = _Saving.saved;
+  bool _touched = false; // nothing is written until she changes something
+  Timer? _debounce;
+
+  int get _adults => _people.where((p) => p.age >= 12).length;
+  int get _children => _people.where((p) => p.age < 12).length;
 
   @override
   void initState() {
@@ -47,274 +60,359 @@ class _ProfileScreenState extends State<ProfileScreen> {
   void _apply(FamilyProfile saved) {
     if (!mounted) return;
     setState(() {
-      _country.text = saved.country;
       _habits.text = saved.habits;
       _spice = saved.spice;
+      _country = saved.country;
       _cuisines
         ..clear()
-        ..addAll(saved.cuisines);
-      for (final p in saved.people) {
-        _people.add(_PersonRow(age: p.age.toString(), gender: p.gender));
-      }
+        ..addAll(saved.cuisines.where(profileCuisines.contains));
+      _people
+        ..clear()
+        ..addAll(saved.people);
       _loaded = true;
     });
   }
 
   @override
   void dispose() {
-    _country.dispose();
-    _habits.dispose();
-    for (final row in _people) {
-      row.age.dispose();
+    // A change made in the last moment is still sent.
+    if (_debounce?.isActive ?? false) {
+      _debounce!.cancel();
+      unawaited(widget.onSave(_build()).catchError((_) {}));
     }
+    _habits.dispose();
     super.dispose();
   }
 
+  FamilyProfile _build() => FamilyProfile(
+        people: List.of(_people),
+        country: _country,
+        spice: _spice,
+        cuisines: profileCuisines.where(_cuisines.contains).toList(),
+        habits: _habits.text.trim(),
+      );
+
+  /// Called after every change: waits a moment for more changes, then saves once.
+  void _changed() {
+    _touched = true;
+    _debounce?.cancel();
+    setState(() => _state = _Saving.saving);
+    _debounce = Timer(const Duration(milliseconds: 600), _save);
+  }
+
   Future<void> _save() async {
-    final people = <Person>[];
-    for (var i = 0; i < _people.length; i++) {
-      final age = int.tryParse(_people[i].age.text.trim());
-      if (age == null || age < 0 || age > 120) {
-        setState(() => _error = 'Please type an age between 0 and 120 for person ${i + 1}.');
-        return;
-      }
-      people.add(Person(age: age, gender: _people[i].gender));
-    }
-    final profile = FamilyProfile(
-      people: people,
-      country: _country.text.trim(),
-      spice: _spice,
-      cuisines: profileCuisines.where(_cuisines.contains).toList(),
-      habits: _habits.text.trim(),
-    );
-    setState(() {
-      _busy = true;
-      _error = null;
-    });
-    var savedOffline = false;
+    if (!_touched) return;
+    setState(() => _state = _Saving.saving);
     try {
       // Without internet the phone keeps the change and sends it later, so do not wait forever.
-      await widget.onSave(profile).timeout(const Duration(seconds: 8));
+      await widget.onSave(_build()).timeout(const Duration(seconds: 8));
+      if (mounted) setState(() => _state = _Saving.saved);
     } on TimeoutException {
-      savedOffline = true;
+      if (mounted) setState(() => _state = _Saving.offline);
     } catch (_) {
-      if (mounted) {
-        setState(() {
-          _error = 'Could not save. Please check your internet and try again.';
-          _busy = false;
-        });
-      }
-      return;
+      if (mounted) setState(() => _state = _Saving.failed);
     }
-    if (!mounted) return;
-    final messenger = ScaffoldMessenger.of(context);
-    Navigator.of(context).pop();
-    messenger
-      ..hideCurrentSnackBar()
-      ..showSnackBar(SnackBar(
-        content: Text(savedOffline
-            ? 'Saved on your phone. It will sync when you are online.'
-            : 'Saved. Dish ideas will now follow your family\'s tastes.'),
-      ));
+  }
+
+  void _setCount({required bool child, required int delta}) {
+    Haptics.tick();
+    setState(() {
+      final isKind = child ? (Person p) => p.age < 12 : (Person p) => p.age >= 12;
+      if (delta > 0) {
+        _people.add(Person(age: child ? 8 : 35, gender: 'Female'));
+      } else {
+        final at = _people.lastIndexWhere(isKind);
+        if (at >= 0) _people.removeAt(at);
+      }
+    });
+    _changed();
   }
 
   @override
   Widget build(BuildContext context) {
-    final text = Theme.of(context).textTheme;
-    return Scaffold(
-      appBar: AppBar(title: const Text('Family profile')),
-      body: SafeArea(
-        child: !_loaded
-            ? const Center(child: CircularProgressIndicator())
-            : ListView(
-                padding: const EdgeInsets.fromLTRB(20, 4, 20, 32),
+    final text = context.text;
+    final colors = context.colors;
+    return SafeArea(
+      child: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: maxContentWidth),
+          child: ListView(
+            padding: const EdgeInsets.fromLTRB(Space.l, Space.m, Space.l, Space.xl),
+            children: [
+              Row(
                 children: [
-                  Text('Who are you cooking for?', style: text.titleLarge),
-                  const SizedBox(height: 12),
-                  if (_people.isEmpty)
-                    Text(
-                      'Add each person you cook for, so dishes suit your family.',
-                      style: text.bodyMedium?.copyWith(color: mutedBrown, fontSize: 16),
-                    ),
-                  for (var i = 0; i < _people.length; i++) _personRow(i),
-                  const SizedBox(height: 8),
-                  OutlinedButton.icon(
-                    style: OutlinedButton.styleFrom(
-                      minimumSize: const Size.fromHeight(52),
-                      foregroundColor: terracotta,
-                      side: const BorderSide(color: terracotta),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                    ),
-                    onPressed: () => setState(() => _people.add(_PersonRow())),
-                    icon: const Icon(Icons.person_add_alt_rounded),
-                    label: const Text('Add a person'),
-                  ),
-                  const SizedBox(height: 28),
-                  Text('Where do you live?', style: text.titleLarge),
-                  const SizedBox(height: 12),
-                  TextField(
-                    controller: _country,
-                    textCapitalization: TextCapitalization.words,
-                    decoration: const InputDecoration(labelText: 'Country', hintText: 'For example: Pakistan'),
-                  ),
-                  const SizedBox(height: 28),
-                  Text('How spicy does your family like it?', style: text.titleLarge),
-                  const SizedBox(height: 12),
-                  Wrap(
-                    spacing: 10,
-                    runSpacing: 10,
+                  Expanded(child: Text('Family', style: text.headlineMedium)),
+                  _SaveChip(state: _state, onRetry: _save),
+                ],
+              ),
+              const SizedBox(height: Space.m),
+              if (!_loaded)
+                SkeletonLoader.list(count: 3, itemHeight: 120)
+              else ...[
+                AppCard(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      for (final level in const ['Mild', 'Medium', 'Hot'])
-                        _chip(
-                          label: level,
-                          selected: _spice == level,
-                          // tapping the chosen one again clears it
-                          onTap: () => setState(() => _spice = _spice == level ? '' : level),
-                        ),
-                    ],
-                  ),
-                  const SizedBox(height: 28),
-                  Text('What kind of food do they like?', style: text.titleLarge),
-                  const SizedBox(height: 12),
-                  Wrap(
-                    spacing: 10,
-                    runSpacing: 10,
-                    children: [
-                      for (final cuisine in profileCuisines)
-                        _chip(
-                          label: cuisine,
-                          selected: _cuisines.contains(cuisine),
-                          onTap: () => setState(() {
-                            if (!_cuisines.remove(cuisine)) _cuisines.add(cuisine);
-                          }),
-                        ),
-                    ],
-                  ),
-                  const SizedBox(height: 28),
-                  Text('Anything else?', style: text.titleLarge),
-                  const SizedBox(height: 12),
-                  TextField(
-                    controller: _habits,
-                    minLines: 3,
-                    maxLines: 5,
-                    maxLength: 300,
-                    textCapitalization: TextCapitalization.sentences,
-                    decoration: const InputDecoration(
-                      hintText: 'For example: The men like desi food, the kids like junk food.',
-                    ),
-                  ),
-                  if (_error != null) ...[
-                    const SizedBox(height: 8),
-                    Container(
-                      padding: const EdgeInsets.all(14),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFFBE4E1),
-                        borderRadius: BorderRadius.circular(14),
-                      ),
-                      child: Row(
+                      Text('Who eats at home', style: text.titleLarge),
+                      const SizedBox(height: Space.m),
+                      Row(
                         children: [
-                          const Icon(Icons.error_outline_rounded, color: Color(0xFFB3261E)),
-                          const SizedBox(width: 10),
                           Expanded(
-                            child: Text(_error!,
-                                style: const TextStyle(color: Color(0xFF7A1A14), fontSize: 15)),
+                            child: _CountStepper(
+                              label: 'Adults',
+                              value: _adults,
+                              onLess: () => _setCount(child: false, delta: -1),
+                              onMore: () => _setCount(child: false, delta: 1),
+                            ),
+                          ),
+                          const SizedBox(width: Space.m),
+                          Expanded(
+                            child: _CountStepper(
+                              label: 'Children under 12',
+                              value: _children,
+                              onLess: () => _setCount(child: true, delta: -1),
+                              onMore: () => _setCount(child: true, delta: 1),
+                            ),
                           ),
                         ],
                       ),
-                    ),
-                  ],
-                  const SizedBox(height: 16),
-                  FilledButton.icon(
-                    onPressed: _busy ? null : _save,
-                    icon: _busy
-                        ? const SizedBox(
-                            height: 20,
-                            width: 20,
-                            child: CircularProgressIndicator(strokeWidth: 2.5, color: Colors.white))
-                        : const Icon(Icons.check_rounded),
-                    label: const Text('Save'),
+                    ],
                   ),
-                  const SizedBox(height: 20),
-                  Text(
-                    'Only you can see this. When the app asks the cooking helper (AI) for ideas, it '
-                    'shares your family size, spice level and tastes, but never exact ages, names or email.',
-                    style: text.bodyMedium?.copyWith(color: mutedBrown, fontSize: 14, height: 1.4),
+                ),
+                const SizedBox(height: Space.m),
+                AppCard(child: _spiceSection(context)),
+                const SizedBox(height: Space.m),
+                AppCard(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('Favourite cuisines', style: text.titleLarge),
+                      const SizedBox(height: Space.m),
+                      Wrap(
+                        spacing: Space.s,
+                        runSpacing: Space.s,
+                        children: [
+                          for (final cuisine in profileCuisines)
+                            _CuisineChip(
+                              label: cuisine,
+                              selected: _cuisines.contains(cuisine),
+                              onTap: () {
+                                Haptics.tick();
+                                setState(() {
+                                  if (!_cuisines.remove(cuisine)) _cuisines.add(cuisine);
+                                });
+                                _changed();
+                              },
+                            ),
+                        ],
+                      ),
+                    ],
                   ),
-                ],
-              ),
+                ),
+                const SizedBox(height: Space.m),
+                Text('Anything we should know?', style: text.titleMedium),
+                const SizedBox(height: Space.s),
+                TextField(
+                  controller: _habits,
+                  minLines: 2,
+                  maxLines: 4,
+                  maxLength: 300,
+                  textCapitalization: TextCapitalization.sentences,
+                  onChanged: (_) => _changed(),
+                  decoration: const InputDecoration(hintText: 'For example: no mushrooms, less fried food'),
+                ),
+                const SizedBox(height: Space.s),
+                AppCard(
+                  color: colors.surfaceContainer,
+                  borderColor: colors.surfaceContainer,
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Icon(Icons.lock_outline_rounded, color: colors.primary),
+                      const SizedBox(width: Space.m),
+                      Expanded(
+                        child: Text(
+                          'The AI only sees family size, spice level and favourite cuisines. '
+                          'It never gets names, exact ages or your email.',
+                          style: text.bodySmall,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ),
       ),
     );
   }
 
-  Widget _personRow(int i) {
-    final row = _people[i];
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 10),
-      child: Container(
-        padding: const EdgeInsets.fromLTRB(14, 10, 6, 10),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(18),
-          border: Border.all(color: lineTan),
-        ),
-        child: Row(
+  Widget _spiceSection(BuildContext context) {
+    final text = context.text;
+    final colors = context.colors;
+    // Until she chooses, the slider rests on Medium but nothing is saved for her.
+    final shown = _spice.isEmpty ? 'Medium' : _spice;
+    final index = _spiceLevels.indexOf(shown);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
           children: [
-            SizedBox(
-              width: 84,
-              child: TextField(
-                controller: row.age,
-                keyboardType: TextInputType.number,
-                decoration: InputDecoration(
-                  labelText: 'Age',
-                  isDense: true,
-                  semanticCounterText: 'Age of person ${i + 1}',
-                ),
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Wrap(
-                spacing: 8,
-                children: [
-                  for (final gender in const ['Female', 'Male'])
-                    _chip(
-                      label: gender,
-                      selected: row.gender == gender,
-                      onTap: () => setState(() => row.gender = gender),
-                    ),
-                ],
-              ),
-            ),
-            IconButton(
-              tooltip: 'Remove person ${i + 1}',
-              icon: const Icon(Icons.delete_outline_rounded),
-              onPressed: () => setState(() {
-                final removed = _people.removeAt(i);
-                removed.age.dispose();
-              }),
-            ),
+            Expanded(child: Text('Spice level', style: text.titleLarge)),
+            Text(shown, style: text.titleMedium?.copyWith(color: colors.primary)),
           ],
         ),
+        Slider(
+          value: index.toDouble(),
+          min: 0,
+          max: 2,
+          divisions: 2,
+          semanticFormatterCallback: (v) => _spiceLevels[v.round()],
+          onChanged: (v) {
+            final level = _spiceLevels[v.round()];
+            if (level == shown && _spice.isNotEmpty) return;
+            Haptics.tick();
+            setState(() => _spice = level);
+            _changed();
+          },
+        ),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            for (var i = 0; i < _spiceLevels.length; i++)
+              Row(
+                children: [
+                  for (var f = 0; f <= i; f++)
+                    Icon(Icons.local_fire_department_rounded, size: 16, color: colors.primary),
+                  const SizedBox(width: Space.xs),
+                  Text(_spiceLevels[i], style: text.bodySmall?.copyWith(color: colors.onSurfaceVariant)),
+                ],
+              ),
+          ],
+        ),
+        const SizedBox(height: Space.s),
+        Text(_spiceHelp[shown]!, style: text.bodySmall?.copyWith(color: colors.onSurfaceVariant)),
+      ],
+    );
+  }
+}
+
+class _SaveChip extends StatelessWidget {
+  const _SaveChip({required this.state, required this.onRetry});
+  final _Saving state;
+  final VoidCallback onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    switch (state) {
+      case _Saving.saved:
+        return const StatusChip(label: 'Saved just now', icon: Icons.cloud_done_outlined, tone: StatusTone.success);
+      case _Saving.saving:
+        return const StatusChip(label: 'Saving…', icon: Icons.cloud_upload_outlined, tone: StatusTone.warning);
+      case _Saving.offline:
+        return const StatusChip(
+            label: 'Saved on your phone', icon: Icons.cloud_off_rounded, tone: StatusTone.warning);
+      case _Saving.failed:
+        return ActionChip(
+          avatar: Icon(Icons.refresh_rounded, size: 18, color: context.colors.onErrorContainer),
+          label: Text('Could not save. Try again', style: TextStyle(color: context.colors.onErrorContainer)),
+          backgroundColor: context.colors.errorContainer,
+          onPressed: onRetry,
+        );
+    }
+  }
+}
+
+/// A label, then minus, the number, and plus: tapping is easier than typing and cannot be wrong.
+class _CountStepper extends StatelessWidget {
+  const _CountStepper({required this.label, required this.value, required this.onLess, required this.onMore});
+
+  final String label;
+  final int value;
+  final VoidCallback onLess;
+  final VoidCallback onMore;
+
+  @override
+  Widget build(BuildContext context) {
+    final text = context.text;
+    return Semantics(
+      container: true,
+      label: '$label: $value',
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(label, style: text.labelMedium?.copyWith(color: context.colors.onSurfaceVariant)),
+          const SizedBox(height: Space.xs),
+          Row(
+            children: [
+              IconButton.outlined(
+                tooltip: 'Fewer: $label',
+                onPressed: value > 0 ? onLess : null,
+                icon: const Icon(Icons.remove_rounded),
+              ),
+              Expanded(
+                child: ExcludeSemantics(
+                  child: Text('$value', textAlign: TextAlign.center, style: text.titleLarge),
+                ),
+              ),
+              IconButton.filledTonal(
+                tooltip: 'More: $label',
+                onPressed: value < 20 ? onMore : null,
+                icon: const Icon(Icons.add_rounded),
+              ),
+            ],
+          ),
+        ],
       ),
     );
   }
+}
 
-  Widget _chip({required String label, required bool selected, required VoidCallback onTap}) {
-    return ChoiceChip(
-      label: Text(label),
+class _CuisineChip extends StatelessWidget {
+  const _CuisineChip({required this.label, required this.selected, required this.onTap});
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.colors;
+    return Semantics(
+      button: true,
       selected: selected,
-      showCheckmark: false,
-      onSelected: (_) => onTap(),
-      labelStyle: TextStyle(
-        fontSize: 16,
-        fontWeight: FontWeight.w700,
-        color: selected ? Colors.white : inkBrown,
+      label: label,
+      excludeSemantics: true,
+      onTap: onTap,
+      child: Material(
+        color: selected ? colors.primaryContainer : colors.surfaceContainerLowest,
+        shape: RoundedRectangleBorder(
+          borderRadius: Corner.smallRadius,
+          side: BorderSide(color: selected ? colors.primary : colors.outlineVariant, width: selected ? 1.5 : 1),
+        ),
+        child: InkWell(
+          borderRadius: Corner.smallRadius,
+          onTap: onTap,
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(minHeight: 44, minWidth: 64),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: Space.m),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (selected) ...[
+                    Icon(Icons.check_rounded, size: 18, color: colors.onPrimaryContainer),
+                    const SizedBox(width: Space.xs),
+                  ],
+                  Text(label,
+                      style: context.text.labelLarge
+                          ?.copyWith(color: selected ? colors.onPrimaryContainer : colors.onSurface)),
+                ],
+              ),
+            ),
+          ),
+        ),
       ),
-      selectedColor: terracotta,
-      backgroundColor: Colors.white,
-      side: const BorderSide(color: lineTan),
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
     );
   }
 }
