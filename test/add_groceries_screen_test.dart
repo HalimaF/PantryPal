@@ -9,7 +9,8 @@ import 'package:what_can_i_cook/screens/add_groceries_screen.dart';
 import 'package:what_can_i_cook/services/data_service.dart';
 import 'package:what_can_i_cook/services/gemini_service.dart';
 import 'package:what_can_i_cook/services/photo_picker.dart';
-import 'package:what_can_i_cook/theme.dart';
+
+import 'helpers/test_app.dart';
 
 /// Stands in for Firestore: remembers what was added.
 class _FakeData extends DataService {
@@ -61,16 +62,13 @@ Future<_FakeData> _open(
   tester.view.devicePixelRatio = 1;
   addTearDown(tester.view.reset);
   final data = _FakeData();
-  await tester.pumpWidget(MaterialApp(
-    theme: buildTheme(useWebFonts: false),
-    home: AddGroceriesScreen(
-      data: data,
-      pickPhoto: pickPhoto ?? (_) async => PickedPhoto(Uint8List.fromList(_tinyPng), 'image/png'),
-      gemini: GeminiService(
-        generateImage: generateImage ?? (_, _, _, _) async => _found([_milk]),
-      ),
+  await tester.pumpWidget(testApp(AddGroceriesScreen(
+    data: data,
+    pickPhoto: pickPhoto ?? (_) async => PickedPhoto(Uint8List.fromList(_tinyPng), 'image/png'),
+    gemini: GeminiService(
+      generateImage: generateImage ?? (_, _, _, _) async => _found([_milk]),
     ),
-  ));
+  )));
   await tester.pumpAndSettle();
   return data;
 }
@@ -80,13 +78,23 @@ Future<void> _takePhoto(WidgetTester tester) async {
   await tester.pumpAndSettle();
 }
 
-String _text(WidgetTester tester, Key key) =>
-    tester.widget<TextField>(find.byKey(key)).controller!.text;
+Future<void> _saveAll(WidgetTester tester, String label) async {
+  await tester.tap(find.text(label));
+  await tester.pumpAndSettle();
+}
 
-Finder get _manualName => find.widgetWithText(TextField, 'Item').first;
+/// Types an item through "Type it in".
+Future<void> _typeItem(WidgetTester tester, String name, String amount) async {
+  await tester.tap(find.text('Type it in'));
+  await tester.pumpAndSettle();
+  await tester.enterText(find.byKey(const Key('line-name')), name);
+  await tester.enterText(find.byKey(const Key('line-amount')), amount);
+  await tester.tap(find.text('Add to list'));
+  await tester.pumpAndSettle();
+}
 
 void main() {
-  testWidgets('a photo of one item shows it for checking, with the amount filled in', (tester) async {
+  testWidgets('a photo of one item puts it on the list with the amount filled in', (tester) async {
     String? sentMime;
     await _open(tester, generateImage: (prompt, _, bytes, mime) async {
       sentMime = mime;
@@ -96,16 +104,15 @@ void main() {
 
     await _takePhoto(tester);
 
-    expect(find.text('Found in your photo'), findsOneWidget);
-    expect(find.text('I found 1 item. Please check it.'), findsOneWidget);
-    expect(_text(tester, const Key('detected-name-0')), 'Olpers Milk');
-    expect(_text(tester, const Key('detected-amount-0')), '1');
+    expect(find.text('We found 1 item in your photo.'), findsOneWidget);
+    expect(find.text('Olpers Milk'), findsOneWidget);
+    expect(find.text('1 L'), findsOneWidget);
     expect(find.byType(Image), findsOneWidget);
-    expect(find.text('Add 1 item'), findsOneWidget);
+    expect(find.text('Save 1 item'), findsOneWidget);
     expect(sentMime, 'image/png');
   });
 
-  testWidgets('a photo with several items lists every one, and adds them all at once', (tester) async {
+  testWidgets('a photo with several items lists every one, and saves them all at once', (tester) async {
     final data = await _open(
       tester,
       generateImage: (_, _, _, _) async => _found([_milk, _shan, _national]),
@@ -113,86 +120,134 @@ void main() {
 
     await _takePhoto(tester);
 
-    expect(find.text('I found 3 items. Please check them.'), findsOneWidget);
-    expect(_text(tester, const Key('detected-name-0')), 'Olpers Milk');
-    expect(_text(tester, const Key('detected-name-1')), 'Shan Chaat Masala');
-    expect(_text(tester, const Key('detected-name-2')), 'National Chaat Masala');
-    expect(find.text('Add 3 items'), findsOneWidget);
+    expect(find.text('We found 3 items in your photo.'), findsOneWidget);
+    expect(find.text('Olpers Milk'), findsOneWidget);
+    expect(find.text('Shan Chaat Masala'), findsOneWidget);
+    expect(find.text('National Chaat Masala'), findsOneWidget);
+    expect(find.text('Save all 3 items'), findsOneWidget);
 
-    await tester.ensureVisible(find.text('Add 3 items'));
-    await tester.tap(find.text('Add 3 items'));
-    await tester.pumpAndSettle();
+    await _saveAll(tester, 'Save all 3 items');
 
     expect(data.added, [
       (name: 'Olpers Milk', amount: 1.0, unit: 'L'),
       (name: 'Shan Chaat Masala', amount: 1.0, unit: 'packs'),
       (name: 'National Chaat Masala', amount: 1.0, unit: 'packs'),
     ]);
-    expect(find.text('Found in your photo'), findsNothing); // cleared for the next photo
+    expect(find.text('Save all 3 items'), findsNothing); // the list is cleared for next time
+    expect(find.text('Olpers Milk'), findsNothing);
     expect(find.byType(Image), findsNothing);
   });
 
-  testWidgets('an item can be unticked and is then not added', (tester) async {
+  testWidgets('the plus and minus buttons change the amount that is saved', (tester) async {
+    final data = await _open(tester, generateImage: (_, _, _, _) async => _found([_milk]));
+    await _takePhoto(tester);
+
+    await tester.tap(find.byTooltip('More Olpers Milk'));
+    await tester.pump();
+    expect(find.text('1.5 L'), findsOneWidget);
+
+    await _saveAll(tester, 'Save 1 item');
+    expect(data.added.single.amount, 1.5);
+  });
+
+  testWidgets('when the amount is not visible the card says so and she must fix it before saving',
+      (tester) async {
+    final data = await _open(tester, generateImage: (_, _, _, _) async => _found(['{"name":"Chicken"}']));
+    await _takePhoto(tester);
+
+    expect(find.text('We found 1 item in your photo. 1 needs a check.'), findsOneWidget);
+    expect(find.text('Amount unclear. Tap to fix.'), findsOneWidget);
+
+    await _saveAll(tester, 'Save 1 item');
+    expect(find.textContaining('Please say how much Chicken'), findsOneWidget);
+    expect(data.added, isEmpty);
+
+    await tester.tap(find.text('Chicken'));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byKey(const Key('line-amount')), '1');
+    await tester.tap(find.text('Done'));
+    await tester.pumpAndSettle();
+    expect(find.text('Amount unclear. Tap to fix.'), findsNothing);
+
+    await _saveAll(tester, 'Save 1 item');
+    expect(data.added.single.name, 'Chicken');
+    expect(data.added.single.amount, 1);
+  });
+
+  testWidgets('names, amounts and units can be corrected before saving', (tester) async {
+    final data = await _open(tester, generateImage: (_, _, _, _) async => _found([_milk]));
+    await _takePhoto(tester);
+
+    await tester.tap(find.text('Olpers Milk'));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byKey(const Key('line-name')), 'Haleeb Milk');
+    await tester.enterText(find.byKey(const Key('line-amount')), '2,5');
+    await tester.tap(find.text('Done'));
+    await tester.pumpAndSettle();
+
+    await _saveAll(tester, 'Save 1 item');
+    expect(data.added, [(name: 'Haleeb Milk', amount: 2.5, unit: 'L')]);
+  });
+
+  testWidgets('an item can be removed from the list and is then not saved', (tester) async {
     final data = await _open(
       tester,
       generateImage: (_, _, _, _) async => _found([_milk, _shan, _national]),
     );
     await _takePhoto(tester);
 
-    await tester.ensureVisible(find.byKey(const Key('detected-include-1')));
-    await tester.tap(find.byKey(const Key('detected-include-1')));
-    await tester.pump();
-    expect(find.text('Add 2 items'), findsOneWidget);
-
-    await tester.ensureVisible(find.text('Add 2 items'));
-    await tester.tap(find.text('Add 2 items'));
+    await tester.tap(find.text('Shan Chaat Masala'));
     await tester.pumpAndSettle();
+    await tester.tap(find.text('Remove from list'));
+    await tester.pumpAndSettle();
+    expect(find.text('Save all 2 items'), findsOneWidget);
 
+    await _saveAll(tester, 'Save all 2 items');
     expect(data.added.map((i) => i.name), ['Olpers Milk', 'National Chaat Masala']);
   });
 
-  testWidgets('names, amounts and units can be corrected before adding', (tester) async {
-    final data = await _open(tester, generateImage: (_, _, _, _) async => _found([_milk]));
-    await _takePhoto(tester);
+  testWidgets('typing an item adds it to the list, and Save puts it in the kitchen', (tester) async {
+    final data = await _open(tester);
 
-    await tester.enterText(find.byKey(const Key('detected-name-0')), 'Haleeb Milk');
-    await tester.enterText(find.byKey(const Key('detected-amount-0')), '2,5');
-    await tester.ensureVisible(find.text('Add 1 item'));
-    await tester.tap(find.text('Add 1 item'));
-    await tester.pumpAndSettle();
+    await _typeItem(tester, 'Rice', '5');
+    expect(find.text('Rice'), findsOneWidget);
+    expect(data.added, isEmpty); // nothing is saved until she says so
 
-    expect(data.added, [(name: 'Haleeb Milk', amount: 2.5, unit: 'L')]);
+    await _saveAll(tester, 'Save 1 item');
+    expect(data.added.single.name, 'Rice');
+    expect(data.added.single.amount, 5);
   });
 
-  testWidgets('when the amount is not visible she must type it before adding', (tester) async {
-    final data = await _open(tester, generateImage: (_, _, _, _) async => _found(['{"name":"Chicken"}']));
-    await _takePhoto(tester);
+  testWidgets('typing needs a name and an amount, and says what is missing', (tester) async {
+    await _open(tester);
 
-    expect(_text(tester, const Key('detected-amount-0')), isEmpty);
-    await tester.ensureVisible(find.text('Add 1 item'));
-    await tester.tap(find.text('Add 1 item'));
-    await tester.pump();
-
-    expect(find.textContaining('Please type how much Chicken'), findsOneWidget);
-    expect(data.added, isEmpty);
-
-    await tester.enterText(find.byKey(const Key('detected-amount-0')), '1');
-    await tester.tap(find.text('Add 1 item'));
+    await tester.tap(find.text('Type it in'));
     await tester.pumpAndSettle();
-    expect(data.added.single.name, 'Chicken');
-    expect(data.added.single.amount, 1);
+    await tester.tap(find.text('Add to list'));
+    await tester.pump();
+    expect(find.textContaining('Please type what you bought'), findsOneWidget);
+
+    await tester.enterText(find.byKey(const Key('line-name')), 'Rice');
+    await tester.tap(find.text('Add to list'));
+    await tester.pump();
+    expect(find.textContaining('Please type how much'), findsOneWidget);
   });
 
-  testWidgets('every item unticked leaves nothing to add', (tester) async {
-    await _open(tester, generateImage: (_, _, _, _) async => _found([_milk]));
-    await _takePhoto(tester);
+  testWidgets('the often-bought chips add a starting amount to the list', (tester) async {
+    final data = await _open(tester);
 
-    await tester.ensureVisible(find.byKey(const Key('detected-include-0')));
-    await tester.tap(find.byKey(const Key('detected-include-0')));
+    await tester.tap(find.widgetWithText(ActionChip, 'Milk'));
     await tester.pump();
+    expect(find.text('Save 1 item'), findsOneWidget);
 
-    final button = tester.widget<FilledButton>(find.widgetWithText(FilledButton, 'Add 0 items'));
-    expect(button.onPressed, isNull);
+    await _saveAll(tester, 'Save 1 item');
+    expect(data.added.single, (name: 'Milk', amount: 1.0, unit: 'L'));
+  });
+
+  testWidgets('with nothing on the list there is no Save button', (tester) async {
+    await _open(tester);
+
+    expect(find.textContaining('Save'), findsNothing);
   });
 
   testWidgets('when Gemini cannot tell, she is asked to type it', (tester) async {
@@ -201,7 +256,7 @@ void main() {
     await _takePhoto(tester);
 
     expect(find.textContaining('I could not tell what this is'), findsOneWidget);
-    expect(find.text('Found in your photo'), findsNothing);
+    expect(find.textContaining('Save'), findsNothing);
   });
 
   testWidgets('when the photo cannot be read at all, she is asked to type it', (tester) async {
@@ -210,7 +265,6 @@ void main() {
     await _takePhoto(tester);
 
     expect(find.textContaining('I could not read that photo'), findsOneWidget);
-    expect(find.text('Found in your photo'), findsNothing);
   });
 
   testWidgets('backing out of the camera changes nothing', (tester) async {
@@ -219,7 +273,7 @@ void main() {
     await _takePhoto(tester);
 
     expect(find.byType(Image), findsNothing);
-    expect(find.text('Found in your photo'), findsNothing);
+    expect(find.textContaining('found'), findsNothing);
   });
 
   testWidgets('if the camera cannot open she is told, and can still type', (tester) async {
@@ -228,11 +282,8 @@ void main() {
     await _takePhoto(tester);
 
     expect(find.textContaining('Could not open the photos'), findsOneWidget);
-    await tester.enterText(_manualName, 'Rice');
-    await tester.enterText(find.widgetWithText(TextField, 'How much'), '5');
-    await tester.ensureVisible(find.text('Add to my groceries'));
-    await tester.tap(find.text('Add to my groceries'));
-    await tester.pumpAndSettle();
+    await _typeItem(tester, 'Rice', '5');
+    await _saveAll(tester, 'Save 1 item');
     expect(data.added.single.name, 'Rice');
   });
 
@@ -248,8 +299,7 @@ void main() {
     ];
 
     await _takePhoto(tester);
-    await tester.ensureVisible(find.text('Add 1 item'));
-    await tester.tap(find.text('Add 1 item'));
+    await tester.tap(find.text('Save 1 item'));
     await tester.pump();
 
     expect(
@@ -268,26 +318,29 @@ void main() {
     ];
 
     await _takePhoto(tester);
-    await tester.ensureVisible(find.text('Add 1 item'));
-    await tester.tap(find.text('Add 1 item'));
+    await tester.tap(find.text('Save 1 item'));
     await tester.pump();
 
     expect(find.text('Added National Chaat Masala, 1 packs.'), findsOneWidget);
   });
 
-  testWidgets('a second photo replaces the first list', (tester) async {
+  testWidgets("a second photo replaces the first photo's items but keeps what she typed", (tester) async {
     var photos = 0;
     await _open(tester, generateImage: (_, _, _, _) async {
       photos++;
       return photos == 1 ? _found([_milk, _shan]) : _found([_national]);
     });
 
+    await _typeItem(tester, 'Rice', '5');
     await _takePhoto(tester);
-    expect(find.text('I found 2 items. Please check them.'), findsOneWidget);
+    expect(find.text('We found 2 items in your photo.'), findsOneWidget);
+    expect(find.text('Save all 3 items'), findsOneWidget);
     await _takePhoto(tester);
 
-    expect(find.text('I found 1 item. Please check it.'), findsOneWidget);
-    expect(_text(tester, const Key('detected-name-0')), 'National Chaat Masala');
-    expect(find.byKey(const Key('detected-name-1')), findsNothing);
+    expect(find.text('We found 1 item in your photo.'), findsOneWidget);
+    expect(find.text('National Chaat Masala'), findsOneWidget);
+    expect(find.text('Olpers Milk'), findsNothing);
+    expect(find.text('Rice'), findsOneWidget);
+    expect(find.text('Save all 2 items'), findsOneWidget);
   });
 }
