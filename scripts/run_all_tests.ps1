@@ -5,7 +5,7 @@
 # Steps 2 and 3 clear the app's data on the phone, so you will be logged out afterwards.
 param(
     [string]$Device = "R5CW726FH0N",
-    [string]$Maestro = "C:\Users\Haleema\maestro-install\maestro\bin\maestro.bat",
+    [string]$Maestro = "maestro",   # or the full path to maestro.bat if it is not on your PATH
     [switch]$LaptopOnly
 )
 

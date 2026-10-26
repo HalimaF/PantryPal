@@ -1,10 +1,15 @@
 # Creates (or signs in) a test account on the Firebase project and fills it with sample data.
-# Usage: powershell -File scripts\seed_test_account.ps1
+# Usage: powershell -File scripts\seed_test_account.ps1 -Email you@example.com -Password choose-one
+# Running it again signs in to the same account and refreshes the profile and groceries.
+param(
+  [Parameter(Mandatory = $true)][string]$Email,
+  [Parameter(Mandatory = $true)][string]$Password
+)
 $ErrorActionPreference = 'Stop'
 $key = 'AIzaSyBIU3V5GCyTukAY4bDiUViwa0o35MFbtrY'   # public web key from firebase_options.dart
 $project = 'cookingapp-8eef2'
-$email = 'test.cook@example.com'
-$password = 'CookTest123'
+$email = $Email
+$password = $Password
 
 $body = @{ email = $email; password = $password; returnSecureToken = $true } | ConvertTo-Json
 try {

@@ -30,3 +30,6 @@ firebase-debug.log
 # Test reports are rebuilt by scripts/run_all_tests.ps1
 /test-reports/
 /coverage/
+
+# Demo video project and renders (the video is uploaded to Devpost, not stored in git)
+/brag-output/
