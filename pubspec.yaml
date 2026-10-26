@@ -60,6 +60,7 @@ dev_dependencies:
   patrol: ^4.10.0
   fake_cloud_firestore: ^4.5.0
   firebase_auth_mocks: ^0.16.0
+  flutter_launcher_icons: ^0.14.4
 
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec
@@ -116,3 +117,10 @@ patrol:
   ios:
     # Placeholder: this project has no ios/ folder, so nothing uses it yet.
     bundle_id: com.haleema.whatCanICook
+
+flutter_launcher_icons:
+  android: true
+  ios: false
+  image_path: assets/icon/icon.png
+  adaptive_icon_background: "#B84A17"
+  adaptive_icon_foreground: assets/icon/icon_foreground.png
