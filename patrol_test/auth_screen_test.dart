@@ -12,15 +12,15 @@ void main() {
     await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
     await $.pumpWidgetAndSettle(const WhatCanICookApp());
 
-    expect($('What can I cook today?'), findsOneWidget);
-    expect($('Your name'), findsNothing);
+    expect($('Pantry Pal'), findsOneWidget);
+    expect($(#name), findsNothing);
 
-    await $('Sign up').tap();
-    expect($('Your name'), findsOneWidget);
+    await $('Create an account').tap();
+    expect($(#name), findsOneWidget);
     expect($('Create my account'), findsOneWidget);
 
-    await $('Log in').tap();
-    expect($('Your name'), findsNothing);
+    await $('I already have an account').tap();
+    expect($(#name), findsNothing);
   });
 
   patrolTest('logging in with nothing typed explains what is missing', ($) async {
@@ -35,7 +35,7 @@ void main() {
     await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
     await $.pumpWidgetAndSettle(const WhatCanICookApp());
 
-    await $('Sign up').tap();
+    await $('Create an account').tap();
     await $('Create my account').tap();
     expect($('Please tell us your name.'), findsOneWidget);
   });
@@ -44,7 +44,7 @@ void main() {
     await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
     await $.pumpWidgetAndSettle(const WhatCanICookApp());
 
-    await $('Sign up').tap();
+    await $('Create an account').tap();
     await $(TextField).at(0).enterText('Halima'); // the first box is the name
     await $('Create my account').tap();
     expect($('Please enter your email and password.'), findsOneWidget);

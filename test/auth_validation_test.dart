@@ -22,7 +22,7 @@ void main() {
   group('signing up', () {
     testWidgets('needs a name first', (tester) async {
       await _open(tester);
-      await tester.tap(find.text('Sign up'));
+      await tester.tap(find.text('Create an account'));
       await tester.pump();
 
       await tester.tap(_submit);
@@ -33,10 +33,10 @@ void main() {
 
     testWidgets('a name made only of spaces is not a name', (tester) async {
       await _open(tester);
-      await tester.tap(find.text('Sign up'));
+      await tester.tap(find.text('Create an account'));
       await tester.pump();
 
-      await tester.enterText(find.widgetWithText(TextField, 'Your name'), '   ');
+      await tester.enterText(find.byKey(const Key('name')), '   ');
       await tester.tap(_submit);
       await tester.pump();
 
@@ -45,10 +45,10 @@ void main() {
 
     testWidgets('with a name but no email or password, asks for them', (tester) async {
       await _open(tester);
-      await tester.tap(find.text('Sign up'));
+      await tester.tap(find.text('Create an account'));
       await tester.pump();
 
-      await tester.enterText(find.widgetWithText(TextField, 'Your name'), 'Halima');
+      await tester.enterText(find.byKey(const Key('name')), 'Halima');
       await tester.tap(_submit);
       await tester.pump();
 
@@ -57,11 +57,11 @@ void main() {
 
     testWidgets('an email without a password is not enough', (tester) async {
       await _open(tester);
-      await tester.tap(find.text('Sign up'));
+      await tester.tap(find.text('Create an account'));
       await tester.pump();
 
-      await tester.enterText(find.widgetWithText(TextField, 'Your name'), 'Halima');
-      await tester.enterText(find.widgetWithText(TextField, 'Email'), 'halima@example.com');
+      await tester.enterText(find.byKey(const Key('name')), 'Halima');
+      await tester.enterText(find.byKey(const Key('email')), 'halima@example.com');
       await tester.tap(_submit);
       await tester.pump();
 
@@ -70,7 +70,7 @@ void main() {
 
     testWidgets('reminds her the password needs 6 characters', (tester) async {
       await _open(tester);
-      await tester.tap(find.text('Sign up'));
+      await tester.tap(find.text('Create an account'));
       await tester.pump();
 
       expect(find.text('At least 6 characters'), findsOneWidget);
@@ -90,17 +90,17 @@ void main() {
     testWidgets('does not ask for a name', (tester) async {
       await _open(tester);
 
-      expect(find.text('Your name'), findsNothing);
+      expect(find.byKey(const Key('name')), findsNothing);
       expect(find.text('At least 6 characters'), findsNothing);
     });
 
-    testWidgets('an old message disappears when she switches between log in and sign up', (tester) async {
+    testWidgets('an old message disappears when she switches between sign in and create an account', (tester) async {
       await _open(tester);
       await tester.tap(_submit);
       await tester.pump();
       expect(find.text('Please enter your email and password.'), findsOneWidget);
 
-      await tester.tap(find.text('Sign up'));
+      await tester.tap(find.text('Create an account'));
       await tester.pump();
 
       expect(find.text('Please enter your email and password.'), findsNothing);
@@ -108,9 +108,9 @@ void main() {
 
     testWidgets('typed text is kept when she switches mode', (tester) async {
       await _open(tester);
-      await tester.enterText(find.widgetWithText(TextField, 'Email'), 'halima@example.com');
+      await tester.enterText(find.byKey(const Key('email')), 'halima@example.com');
 
-      await tester.tap(find.text('Sign up'));
+      await tester.tap(find.text('Create an account'));
       await tester.pump();
 
       expect(find.text('halima@example.com'), findsOneWidget);
@@ -120,7 +120,7 @@ void main() {
   group('the password box', () {
     bool hidden(WidgetTester tester) =>
         tester.widget<EditableText>(find.descendant(
-          of: find.widgetWithText(TextField, 'Password'),
+          of: find.byKey(const Key('password')),
           matching: find.byType(EditableText),
         )).obscureText;
 
@@ -128,13 +128,47 @@ void main() {
       await _open(tester);
       expect(hidden(tester), isTrue);
 
-      await tester.tap(find.byTooltip('Show password'));
+      await tester.tap(find.text('Show'));
       await tester.pump();
       expect(hidden(tester), isFalse);
 
-      await tester.tap(find.byTooltip('Hide password'));
+      await tester.tap(find.text('Hide'));
       await tester.pump();
       expect(hidden(tester), isTrue);
+    });
+  });
+
+  group('checks done before the internet is used', () {
+    testWidgets('an email without the full address is flagged next to the field', (tester) async {
+      await _open(tester);
+      await tester.enterText(find.byKey(const Key('email')), 'mum@gmail');
+      await tester.enterText(find.byKey(const Key('password')), 'secret1');
+      await tester.tap(_submit);
+      await tester.pump();
+
+      expect(find.text('Add the full address, like name@gmail.com'), findsOneWidget);
+      expect(find.text('Please enter your email and password.'), findsNothing);
+    });
+
+    testWidgets('Forgot password asks for the email first', (tester) async {
+      await _open(tester);
+      await tester.tap(find.text('Forgot password?'));
+      await tester.pump();
+
+      expect(find.textContaining('Type your email above first'), findsOneWidget);
+    });
+
+    testWidgets('Forgot password is not offered while creating an account', (tester) async {
+      await _open(tester);
+      await tester.tap(find.text('Create an account'));
+      await tester.pump();
+
+      expect(find.text('Forgot password?'), findsNothing);
+    });
+
+    testWidgets('the privacy line is always visible', (tester) async {
+      await _open(tester);
+      expect(find.text('Your groceries and family details stay private to your account.'), findsOneWidget);
     });
   });
 

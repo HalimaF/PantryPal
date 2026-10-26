@@ -4,17 +4,21 @@ import 'package:what_can_i_cook/screens/auth_screen.dart';
 import 'package:what_can_i_cook/theme.dart';
 
 void main() {
-  testWidgets('auth screen switches between log in and sign up', (tester) async {
+  testWidgets('auth screen switches between sign in and create an account', (tester) async {
+    tester.view.physicalSize = const Size(900, 2400);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
     await tester.pumpWidget(
       MaterialApp(theme: buildTheme(useWebFonts: false), home: const AuthScreen()),
     );
 
-    expect(find.widgetWithText(FilledButton, 'Log in'), findsOneWidget);
-    await tester.tap(find.text('Sign up'));
+    expect(find.widgetWithText(FilledButton, 'Sign in'), findsOneWidget);
+    await tester.tap(find.text('Create an account'));
     await tester.pump();
     expect(find.widgetWithText(FilledButton, 'Create my account'), findsOneWidget);
     expect(find.text('At least 6 characters'), findsOneWidget);
-    expect(find.text('Your name'), findsOneWidget);
+    expect(find.byKey(const Key('name')), findsOneWidget);
+    expect(find.text('I already have an account'), findsOneWidget);
   });
 
   test('friendlyAuthError gives kind messages', () {

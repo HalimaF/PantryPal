@@ -4,10 +4,10 @@ appId: com.haleema.what_can_i_cook
 ---
 - launchApp:
     clearState: true
-- assertVisible: "What can I cook today?"
+- assertVisible: "Pantry Pal"
 - assertNotVisible: "Your name"
-- tapOn: "Sign up"
+- tapOn: "Create an account"
 - assertVisible: "Your name"
 - assertVisible: "Create my account"
-- tapOn: "Log in"
+- tapOn: "I already have an account"
 - assertNotVisible: "Your name"

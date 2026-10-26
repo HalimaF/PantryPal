@@ -1,9 +1,12 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
-import '../theme.dart';
+import '../ui/app_button.dart';
+import '../ui/context_ext.dart';
+import '../ui/tokens.dart';
 
-/// Sign-up / log-in on one screen. Implements prd.md > Account.
+/// Sign-in and sign-up on one screen. Implements prd.md > Account.
+/// Errors sit next to the field that caused them and say how to fix it.
 class AuthScreen extends StatefulWidget {
   const AuthScreen({super.key});
 
@@ -18,7 +21,9 @@ class _AuthScreenState extends State<AuthScreen> {
   bool _signingUp = false;
   bool _busy = false;
   bool _showPassword = false;
-  String? _error;
+  String? _emailError;
+  String? _error; // anything that is not about one field
+  String? _info; // good news, like "we sent a reset link"
 
   @override
   void dispose() {
@@ -28,10 +33,25 @@ class _AuthScreenState extends State<AuthScreen> {
     super.dispose();
   }
 
+  void _switchMode(bool signingUp) => setState(() {
+        _signingUp = signingUp;
+        _error = null;
+        _info = null;
+        _emailError = null;
+      });
+
+  /// A cheap check so a typo is caught before the internet is used.
+  static bool _looksLikeEmail(String email) => RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$').hasMatch(email);
+
   Future<void> _submit() async {
     final name = _name.text.trim();
     final email = _email.text.trim();
     final password = _password.text;
+    setState(() {
+      _error = null;
+      _info = null;
+      _emailError = null;
+    });
     if (_signingUp && name.isEmpty) {
       setState(() => _error = 'Please tell us your name.');
       return;
@@ -40,10 +60,11 @@ class _AuthScreenState extends State<AuthScreen> {
       setState(() => _error = 'Please enter your email and password.');
       return;
     }
-    setState(() {
-      _busy = true;
-      _error = null;
-    });
+    if (!_looksLikeEmail(email)) {
+      setState(() => _emailError = 'Add the full address, like name@gmail.com');
+      return;
+    }
+    setState(() => _busy = true);
     try {
       final auth = FirebaseAuth.instance;
       if (_signingUp) {
@@ -64,127 +85,260 @@ class _AuthScreenState extends State<AuthScreen> {
     }
   }
 
+  Future<void> _forgotPassword() async {
+    final email = _email.text.trim();
+    setState(() {
+      _error = null;
+      _info = null;
+      _emailError = null;
+    });
+    if (!_looksLikeEmail(email)) {
+      setState(() => _emailError = 'Type your email above first, then tap Forgot password.');
+      return;
+    }
+    try {
+      await FirebaseAuth.instance.sendPasswordResetEmail(email: email);
+      if (mounted) setState(() => _info = 'We sent a link to $email. Open it to choose a new password.');
+    } on FirebaseAuthException catch (e) {
+      if (mounted) setState(() => _error = friendlyAuthError(e.code));
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    final text = Theme.of(context).textTheme;
+    final text = context.text;
+    final colors = context.colors;
     return Scaffold(
-      body: SafeArea(
-        child: Center(
+      body: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 480),
           child: SingleChildScrollView(
-            padding: const EdgeInsets.fromLTRB(24, 32, 24, 24),
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 420),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Align(
-                    alignment: Alignment.centerLeft,
-                    child: Container(
-                      width: 72,
-                      height: 72,
-                      decoration: const BoxDecoration(color: terracottaSoft, shape: BoxShape.circle),
-                      child: const Icon(Icons.soup_kitchen_rounded, size: 38, color: terracotta),
-                    ),
-                  ),
-                  const SizedBox(height: 24),
-                  Text('What can I cook today?', style: text.headlineLarge),
-                  const SizedBox(height: 10),
-                  Text(
-                    'Know what to make from what is already at home.',
-                    style: text.bodyLarge?.copyWith(color: mutedBrown, fontSize: 18),
-                  ),
-                  const SizedBox(height: 32),
-                  SegmentedButton<bool>(
-                    showSelectedIcon: false,
-                    segments: const [
-                      ButtonSegment(value: false, label: Text('Log in')),
-                      ButtonSegment(value: true, label: Text('Sign up')),
-                    ],
-                    selected: {_signingUp},
-                    onSelectionChanged: _busy
-                        ? null
-                        : (s) => setState(() {
-                              _signingUp = s.first;
-                              _error = null;
-                            }),
-                  ),
-                  const SizedBox(height: 24),
-                  if (_signingUp) ...[
-                    TextField(
-                      controller: _name,
-                      textCapitalization: TextCapitalization.words,
-                      textInputAction: TextInputAction.next,
-                      autofillHints: const [AutofillHints.givenName],
-                      decoration: const InputDecoration(
-                        labelText: 'Your name',
-                        prefixIcon: Icon(Icons.person_outline_rounded),
-                      ),
-                    ),
-                    const SizedBox(height: 14),
-                  ],
-                  TextField(
-                    controller: _email,
-                    keyboardType: TextInputType.emailAddress,
-                    textInputAction: TextInputAction.next,
-                    autofillHints: const [AutofillHints.email],
-                    decoration: const InputDecoration(
-                      labelText: 'Email',
-                      prefixIcon: Icon(Icons.mail_outline_rounded),
-                    ),
-                  ),
-                  const SizedBox(height: 14),
-                  TextField(
-                    controller: _password,
-                    obscureText: !_showPassword,
-                    autofillHints: const [AutofillHints.password],
-                    decoration: InputDecoration(
-                      labelText: 'Password',
-                      helperText: _signingUp ? 'At least 6 characters' : null,
-                      prefixIcon: const Icon(Icons.lock_outline_rounded),
-                      suffixIcon: IconButton(
-                        tooltip: _showPassword ? 'Hide password' : 'Show password',
-                        icon: Icon(_showPassword
-                            ? Icons.visibility_off_outlined
-                            : Icons.visibility_outlined),
-                        onPressed: () => setState(() => _showPassword = !_showPassword),
-                      ),
-                    ),
-                    onSubmitted: (_) => _submit(),
-                  ),
-                  if (_error != null) ...[
-                    const SizedBox(height: 14),
-                    Container(
-                      padding: const EdgeInsets.all(14),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFFBE4E1),
-                        borderRadius: BorderRadius.circular(14),
-                      ),
-                      child: Row(
-                        children: [
-                          const Icon(Icons.error_outline_rounded, color: Color(0xFFB3261E)),
-                          const SizedBox(width: 10),
-                          Expanded(
-                            child: Text(_error!,
-                                style: const TextStyle(color: Color(0xFF7A1A14), fontSize: 15)),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                _Hero(title: 'Pantry Pal', subtitle: 'Decide dinner in a minute, from what is already in your kitchen.'),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(Space.l, Space.l, Space.l, Space.l),
+                  child: AutofillGroup(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        if (_signingUp) ...[
+                          Text('Your name', style: text.labelMedium),
+                          const SizedBox(height: Space.xs),
+                          TextField(
+                            key: const Key('name'),
+                            controller: _name,
+                            textCapitalization: TextCapitalization.words,
+                            textInputAction: TextInputAction.next,
+                            autofillHints: const [AutofillHints.givenName],
+                            decoration: const InputDecoration(hintText: 'For example: Ayesha'),
                           ),
+                          const SizedBox(height: Space.m),
                         ],
-                      ),
+                        Text('Email', style: text.labelMedium),
+                        const SizedBox(height: Space.xs),
+                        TextField(
+                          key: const Key('email'),
+                          controller: _email,
+                          keyboardType: TextInputType.emailAddress,
+                          textInputAction: TextInputAction.next,
+                          autofillHints: const [AutofillHints.email],
+                          decoration: InputDecoration(
+                            hintText: 'name@gmail.com',
+                            error: _emailError == null ? null : _FieldError(_emailError!),
+                            enabledBorder: _emailError == null
+                                ? null
+                                : OutlineInputBorder(
+                                    borderRadius: Corner.mediumRadius,
+                                    borderSide: BorderSide(color: colors.error, width: 2),
+                                  ),
+                          ),
+                        ),
+                        const SizedBox(height: Space.m),
+                        Text('Password', style: text.labelMedium),
+                        const SizedBox(height: Space.xs),
+                        TextField(
+                          key: const Key('password'),
+                          controller: _password,
+                          obscureText: !_showPassword,
+                          autofillHints: const [AutofillHints.password],
+                          onSubmitted: (_) => _submit(),
+                          decoration: InputDecoration(
+                            helperText: _signingUp ? 'At least 6 characters' : null,
+                            suffixIcon: TextButton.icon(
+                              onPressed: () => setState(() => _showPassword = !_showPassword),
+                              icon: Icon(
+                                _showPassword ? Icons.visibility_off_outlined : Icons.visibility_outlined,
+                                size: 20,
+                              ),
+                              label: Text(_showPassword ? 'Hide' : 'Show'),
+                            ),
+                          ),
+                        ),
+                        if (!_signingUp)
+                          Align(
+                            alignment: AlignmentDirectional.centerEnd,
+                            child: TextButton(
+                              onPressed: _busy ? null : _forgotPassword,
+                              child: const Text('Forgot password?'),
+                            ),
+                          ),
+                        if (_error != null) ...[
+                          const SizedBox(height: Space.s),
+                          _Notice(message: _error!, error: true),
+                        ],
+                        if (_info != null) ...[
+                          const SizedBox(height: Space.s),
+                          _Notice(message: _info!, error: false),
+                        ],
+                        const SizedBox(height: Space.m),
+                        AppButton(
+                          label: _signingUp ? 'Create my account' : 'Sign in',
+                          loading: _busy,
+                          loadingLabel: _signingUp ? 'Creating your account…' : 'Signing in…',
+                          onPressed: _submit,
+                        ),
+                        const SizedBox(height: Space.s),
+                        AppButton(
+                          label: _signingUp ? 'I already have an account' : 'Create an account',
+                          kind: AppButtonKind.secondary,
+                          onPressed: _busy ? null : () => _switchMode(!_signingUp),
+                        ),
+                        const SizedBox(height: Space.l),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(Icons.lock_outline_rounded, size: 16, color: colors.onSurfaceVariant),
+                            const SizedBox(width: Space.xs),
+                            Flexible(
+                              child: Text(
+                                'Your groceries and family details stay private to your account.',
+                                textAlign: TextAlign.center,
+                                style: text.bodySmall?.copyWith(color: colors.onSurfaceVariant),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
                     ),
-                  ],
-                  const SizedBox(height: 24),
-                  FilledButton(
-                    onPressed: _busy ? null : _submit,
-                    child: _busy
-                        ? const SizedBox(
-                            height: 24,
-                            width: 24,
-                            child: CircularProgressIndicator(strokeWidth: 3, color: Colors.white))
-                        : Text(_signingUp ? 'Create my account' : 'Log in'),
                   ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// The red top of the page with two dishes peeking in from the corners.
+class _Hero extends StatelessWidget {
+  const _Hero({required this.title, required this.subtitle});
+  final String title;
+  final String subtitle;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.colors;
+    final text = context.text;
+    return Container(
+      decoration: BoxDecoration(
+        color: colors.primary,
+        borderRadius: const BorderRadius.vertical(bottom: Radius.circular(Corner.large + 4)),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: SafeArea(
+        bottom: false,
+        child: Stack(
+          children: [
+            PositionedDirectional(
+              start: -36,
+              top: 8,
+              child: _Plate(icon: Icons.bakery_dining_rounded, size: 112, tone: const Color(0xFFF2C77A)),
+            ),
+            PositionedDirectional(
+              end: -8,
+              top: -8,
+              child: _Plate(icon: Icons.ramen_dining_rounded, size: 120, tone: const Color(0xFFFFF7EC)),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(Space.l, 140, Space.l, Space.l),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Semantics(header: true, child: Text(title, style: text.headlineMedium?.copyWith(color: colors.onPrimary))),
+                  const SizedBox(height: Space.s),
+                  Text(subtitle, style: text.bodyMedium?.copyWith(color: colors.onPrimary)),
                 ],
               ),
             ),
-          ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _Plate extends StatelessWidget {
+  const _Plate({required this.icon, required this.size, required this.tone});
+  final IconData icon;
+  final double size;
+  final Color tone;
+
+  @override
+  Widget build(BuildContext context) {
+    return ExcludeSemantics(
+      child: Container(
+        width: size,
+        height: size,
+        decoration: BoxDecoration(color: tone, shape: BoxShape.circle),
+        child: Icon(icon, size: size * 0.55, color: context.colors.primary),
+      ),
+    );
+  }
+}
+
+/// An icon plus words, so an error never relies on colour alone.
+class _FieldError extends StatelessWidget {
+  const _FieldError(this.message);
+  final String message;
+
+  @override
+  Widget build(BuildContext context) {
+    final color = context.colors.error;
+    return Row(
+      children: [
+        Icon(Icons.error_outline_rounded, size: 16, color: color),
+        const SizedBox(width: Space.xs),
+        Expanded(child: Text(message, style: context.text.bodySmall?.copyWith(color: color))),
+      ],
+    );
+  }
+}
+
+class _Notice extends StatelessWidget {
+  const _Notice({required this.message, required this.error});
+  final String message;
+  final bool error;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.colors;
+    final back = error ? colors.errorContainer : context.appColors.successContainer;
+    final ink = error ? colors.onErrorContainer : context.appColors.onSuccessContainer;
+    return Semantics(
+      liveRegion: true,
+      child: Container(
+        padding: const EdgeInsets.all(Space.m),
+        decoration: BoxDecoration(color: back, borderRadius: Corner.mediumRadius),
+        child: Row(
+          children: [
+            Icon(error ? Icons.error_outline_rounded : Icons.mark_email_read_outlined, color: ink),
+            const SizedBox(width: Space.s),
+            Expanded(child: Text(message, style: context.text.bodyMedium?.copyWith(color: ink))),
+          ],
         ),
       ),
     );
@@ -201,7 +355,7 @@ String friendlyAuthError(String code) {
     case 'invalid-credential':
       return 'Wrong email or password. Please try again.';
     case 'email-already-in-use':
-      return 'This email already has an account. Try logging in.';
+      return 'This email already has an account. Try signing in.';
     case 'weak-password':
       return 'Please choose a password with at least 6 characters.';
     case 'network-request-failed':
