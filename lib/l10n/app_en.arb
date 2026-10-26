@@ -32,5 +32,9 @@
   "@amountTooMuch": { "placeholders": { "max": { "type": "String" } } },
 
   "haveIt": "Have",
-  "missingIt": "Missing"
+  "missingIt": "Missing",
+  "tabHome": "Home",
+  "tabGroceries": "Groceries",
+  "tabCook": "Cook",
+  "tabFamily": "Family"
 }

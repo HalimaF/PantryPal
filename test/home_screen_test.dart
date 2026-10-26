@@ -172,7 +172,7 @@ void main() {
     testWidgets('the big panel opens the dish questions', (tester) async {
       await _open(tester);
 
-      await tester.tap(find.text('Get ideas'));
+      await tester.tap(find.text('Suggest a dish'));
       await tester.pumpAndSettle();
 
       expect(find.text('Tell me about today'), findsOneWidget);
@@ -194,15 +194,6 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.textContaining('Nothing logged yet'), findsOneWidget);
-    });
-
-    testWidgets('Family profile opens its page', (tester) async {
-      await _open(tester);
-
-      await tester.tap(find.text('Family profile'));
-      await tester.pumpAndSettle();
-
-      expect(find.text('Who are you cooking for?'), findsOneWidget);
     });
 
     testWidgets('has a way to log out', (tester) async {

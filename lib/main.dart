@@ -1,10 +1,13 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
+
+import 'l10n/app_localizations.dart';
 
 import 'firebase_options.dart';
 import 'screens/auth_screen.dart';
-import 'screens/home_screen.dart';
+import 'screens/app_shell.dart';
 import 'theme.dart';
 
 Future<void> main() async {
@@ -20,7 +23,15 @@ class WhatCanICookApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'Pantry Pal',
-      theme: buildTheme(),
+      theme: buildLightTheme(),
+      // darkTheme is added once every screen has moved to the new design system.
+      localizationsDelegates: const [
+        AppLocalizations.delegate,
+        GlobalMaterialLocalizations.delegate,
+        GlobalWidgetsLocalizations.delegate,
+        GlobalCupertinoLocalizations.delegate,
+      ],
+      supportedLocales: AppLocalizations.supportedLocales,
       debugShowCheckedModeBanner: false,
       // Firebase remembers the login, so this shows Home straight away on reopen.
       home: StreamBuilder<User?>(
@@ -30,7 +41,7 @@ class WhatCanICookApp extends StatelessWidget {
             return const Scaffold(body: Center(child: CircularProgressIndicator()));
           }
           final user = snapshot.data;
-          return user != null ? HomeScreen(user: user) : const AuthScreen();
+          return user != null ? AppShell(user: user) : const AuthScreen();
         },
       ),
     );

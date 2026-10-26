@@ -90,4 +90,16 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get missingIt => 'Missing';
+
+  @override
+  String get tabHome => 'Home';
+
+  @override
+  String get tabGroceries => 'Groceries';
+
+  @override
+  String get tabCook => 'Cook';
+
+  @override
+  String get tabFamily => 'Family';
 }

@@ -9,8 +9,9 @@ import 'ui/tokens.dart';
 // test/ui/design_system_test.dart (WCAG 2.2 AA).
 // ---------------------------------------------------------------------------------------------
 
-const _terracotta = Color(0xFFB84A17);
-const _leaf = Color(0xFF2F6B3F);
+const _terracotta = Color(0xFFC2381E);
+const _leaf = Color(0xFF2F7D3A);
+const _turmeric = Color(0xFFF2B01E);
 
 /// Colours Material does not have a slot for: success and warning.
 @immutable
@@ -24,6 +25,8 @@ class AppColors extends ThemeExtension<AppColors> {
     required this.onWarning,
     required this.warningContainer,
     required this.onWarningContainer,
+    required this.turmeric,
+    required this.onTurmeric,
   });
 
   final Color success;
@@ -35,6 +38,10 @@ class AppColors extends ThemeExtension<AppColors> {
   final Color warningContainer;
   final Color onWarningContainer;
 
+  /// The hero button colour: bright, with dark text on it.
+  final Color turmeric;
+  final Color onTurmeric;
+
   static const light = AppColors(
     success: _leaf,
     onSuccess: Colors.white,
@@ -42,8 +49,10 @@ class AppColors extends ThemeExtension<AppColors> {
     onSuccessContainer: Color(0xFF11331B),
     warning: Color(0xFF8A5A00),
     onWarning: Colors.white,
-    warningContainer: Color(0xFFFFEBC8),
+    warningContainer: Color(0xFFFFF1D1),
     onWarningContainer: Color(0xFF4A3000),
+    turmeric: _turmeric,
+    onTurmeric: Color(0xFF281A12),
   );
 
   static const dark = AppColors(
@@ -55,6 +64,8 @@ class AppColors extends ThemeExtension<AppColors> {
     onWarning: Color(0xFF3A2800),
     warningContainer: Color(0xFF4A3507),
     onWarningContainer: Color(0xFFFFE2A8),
+    turmeric: Color(0xFFF2B84B),
+    onTurmeric: Color(0xFF281A12),
   );
 
   @override
@@ -70,8 +81,8 @@ ColorScheme _scheme(Brightness brightness) {
   return base.copyWith(
     primary: dark ? const Color(0xFFF08A57) : _terracotta,
     onPrimary: dark ? const Color(0xFF3A1507) : Colors.white,
-    primaryContainer: dark ? const Color(0xFF5A2410) : const Color(0xFFF8E1D3),
-    onPrimaryContainer: dark ? const Color(0xFFFFDBCB) : const Color(0xFF4A1A05),
+    primaryContainer: dark ? const Color(0xFF5A2410) : const Color(0xFFFBE5DF),
+    onPrimaryContainer: dark ? const Color(0xFFFFDBCB) : const Color(0xFF5A1608),
     secondary: dark ? const Color(0xFF7FC08F) : _leaf,
     onSecondary: dark ? const Color(0xFF0F2D18) : Colors.white,
     secondaryContainer: dark ? const Color(0xFF1F3A27) : const Color(0xFFDDEFDF),
@@ -80,35 +91,35 @@ ColorScheme _scheme(Brightness brightness) {
     onError: dark ? const Color(0xFF601410) : Colors.white,
     errorContainer: dark ? const Color(0xFF8C1D18) : const Color(0xFFFBE4E1),
     onErrorContainer: dark ? const Color(0xFFFFDAD6) : const Color(0xFF7A1A14),
-    surface: dark ? const Color(0xFF1D1813) : const Color(0xFFFBF5EA),
-    onSurface: dark ? const Color(0xFFF3E9DC) : const Color(0xFF2B2118),
-    onSurfaceVariant: dark ? const Color(0xFFD3C4B0) : const Color(0xFF5E4E3F),
+    surface: dark ? const Color(0xFF1D1813) : const Color(0xFFFFF7EC),
+    onSurface: dark ? const Color(0xFFF3E9DC) : const Color(0xFF281A12),
+    onSurfaceVariant: dark ? const Color(0xFFD3C4B0) : const Color(0xFF685548),
     surfaceContainerLowest: dark ? const Color(0xFF17130F) : Colors.white,
     surfaceContainerLow: dark ? const Color(0xFF241E18) : const Color(0xFFFFFFFF),
-    surfaceContainer: dark ? const Color(0xFF2B241D) : const Color(0xFFF6EEDF),
-    surfaceContainerHigh: dark ? const Color(0xFF342C24) : const Color(0xFFF3E9D6),
-    surfaceContainerHighest: dark ? const Color(0xFF3D342B) : const Color(0xFFEDE0C8),
-    outline: dark ? const Color(0xFFA08F7B) : const Color(0xFF7A6A5A),
-    outlineVariant: dark ? const Color(0xFF4D4237) : const Color(0xFFE0D1B8),
+    surfaceContainer: dark ? const Color(0xFF2B241D) : const Color(0xFFFBEFDD),
+    surfaceContainerHigh: dark ? const Color(0xFF342C24) : const Color(0xFFF5E8D3),
+    surfaceContainerHighest: dark ? const Color(0xFF3D342B) : const Color(0xFFEDDDC4),
+    outline: dark ? const Color(0xFFA08F7B) : const Color(0xFF8A7664),
+    outlineVariant: dark ? const Color(0xFF4D4237) : const Color(0xFFEADBC4),
   );
 }
 
 // ---------------------------------------------------------------------------------------------
-// Type. Four sizes only: display 28, title 20, body 16, caption 14. Body is never below 16.
+// Type. Four sizes only: title 26, card heading 19, body 16, caption 13. Body is never below 16.
 // Everything scales with the phone's font setting (tested up to 200%).
 // ---------------------------------------------------------------------------------------------
 
-const double _display = 28;
-const double _title = 20;
+const double _display = 26;
+const double _title = 19;
 const double _body = 16;
-const double _caption = 14;
+const double _caption = 13;
 
 TextTheme _textTheme(bool useWebFonts) {
   TextStyle serif(double size) => useWebFonts
-      ? GoogleFonts.fraunces(fontSize: size, fontWeight: FontWeight.w700, height: 1.2)
+      ? GoogleFonts.bricolageGrotesque(fontSize: size, fontWeight: FontWeight.w700, height: 1.2)
       : TextStyle(fontSize: size, fontWeight: FontWeight.w700, height: 1.2);
   TextStyle sans(double size, FontWeight weight, [double height = 1.4]) => useWebFonts
-      ? GoogleFonts.nunito(fontSize: size, fontWeight: weight, height: height)
+      ? GoogleFonts.figtree(fontSize: size, fontWeight: weight, height: height)
       : TextStyle(fontSize: size, fontWeight: weight, height: height);
 
   return TextTheme(
@@ -281,11 +292,11 @@ ThemeData buildTheme({bool useWebFonts = true}) => buildLightTheme(useWebFonts: 
 // Old fixed colours, used directly by screens that are still being redesigned. Each screen moves
 // to Theme.of(context).colorScheme as it is redesigned, and these are deleted with the last one.
 // ---------------------------------------------------------------------------------------------
-const cream = Color(0xFFFBF5EA);
+const cream = Color(0xFFFFF7EC);
 const creamDeep = Color(0xFFF3E9D6);
 const terracotta = _terracotta;
 const terracottaSoft = Color(0xFFF8E1D3);
 const leafGreen = _leaf;
-const inkBrown = Color(0xFF2B2118);
+const inkBrown = Color(0xFF281A12);
 const mutedBrown = Color(0xFF6B5A4A);
 const lineTan = Color(0xFFE6D8C0);

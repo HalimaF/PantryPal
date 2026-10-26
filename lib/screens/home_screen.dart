@@ -3,27 +3,41 @@ import 'package:flutter/material.dart';
 
 import '../logic/days_left.dart';
 import '../models/inventory_item.dart';
+import '../models/meal.dart';
 import '../services/data_service.dart';
-import '../theme.dart';
+import '../ui/app_button.dart';
+import '../ui/app_card.dart';
+import '../ui/context_ext.dart';
+import '../ui/section_header.dart';
+import '../ui/tokens.dart';
 import 'add_groceries_screen.dart';
 import 'daily_log_screen.dart';
 import 'dish_suggestion_screen.dart';
 import 'log_dish_screen.dart';
-import 'profile_screen.dart';
 
-/// Home hub: days until the next shopping, what is left, and the way to every other screen.
-/// Implements prd.md > Screens and Layout (Home dashboard).
+/// Home tab: one big way to ask what to cook, how long the groceries will last, and what was
+/// cooked this week. Implements prd.md > Screens and Layout (Home dashboard).
 class HomeScreen extends StatefulWidget {
-  const HomeScreen({super.key, required this.user, this.data});
+  const HomeScreen({super.key, required this.user, this.data, this.onOpenTab});
 
   final User user;
 
   /// Her saved data. Left out in the app, which makes its own; handed in by tests.
   final DataService? data;
 
+  /// Switches the bottom tab (1 Groceries, 2 Cook, 3 Family). Without it, screens open on top instead.
+  final ValueChanged<int>? onOpenTab;
+
   @override
   State<HomeScreen> createState() => _HomeScreenState();
 }
+
+const _weekdays = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+const _months = [
+  'January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October',
+  'November', 'December',
+];
+const _short = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
 class _HomeScreenState extends State<HomeScreen> {
   User get user => widget.user;
@@ -32,6 +46,16 @@ class _HomeScreenState extends State<HomeScreen> {
   late final DataService _data = widget.data ?? DataService(widget.user.uid);
   late final Stream<List<InventoryItem>> _inventory = _data.inventory();
   late final Stream<ShoppingDates> _dates = _data.shoppingDates();
+  late final Stream<List<MealEntry>> _meals = _data.meals();
+
+  void _openTab(int tab, Widget fallback) {
+    final go = widget.onOpenTab;
+    if (go != null) {
+      go(tab);
+    } else {
+      Navigator.of(context).push(MaterialPageRoute(builder: (_) => fallback));
+    }
+  }
 
   void _openLogDish() => Navigator.of(context).push(
         MaterialPageRoute(
@@ -39,20 +63,10 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
       );
 
-  void _openProfile() => Navigator.of(context).push(
-        MaterialPageRoute(
-          builder: (_) => ProfileScreen(load: _data.profileOnce(), onSave: _data.saveProfile),
-        ),
-      );
-
   void _openDailyLog() => Navigator.of(context).push(
         MaterialPageRoute(
           builder: (_) => DailyLogScreen(meals: _data.meals(), onLogDish: _openLogDish),
         ),
-      );
-
-  void _openAddGroceries() => Navigator.of(context).push(
-        MaterialPageRoute(builder: (_) => AddGroceriesScreen(data: _data)),
       );
 
   Future<void> _askName(BuildContext context) async {
@@ -90,103 +104,83 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final text = Theme.of(context).textTheme;
+    final text = context.text;
+    final colors = context.colors;
     final name = user.displayName?.trim() ?? '';
+    final now = DateTime.now();
 
     // One gentle entrance for the whole page, then it stays still.
-    return Scaffold(
-      body: SafeArea(
-        child: TweenAnimationBuilder<double>(
-          tween: Tween(begin: 0, end: 1),
-          duration: const Duration(milliseconds: 450),
-          curve: Curves.easeOutCubic,
-          builder: (context, t, child) => Opacity(
-            opacity: t,
-            child: Transform.translate(offset: Offset(0, 16 * (1 - t)), child: child),
-          ),
-          child: ListView(
-            padding: const EdgeInsets.fromLTRB(20, 12, 20, 32),
-            children: [
-              Row(
-                children: [
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          name.isEmpty ? _greeting() : '${_greeting()}, $name',
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                          style: text.headlineMedium,
-                        ),
-                        const SizedBox(height: 4),
-                        if (name.isEmpty)
-                          TextButton.icon(
-                            style: TextButton.styleFrom(
-                              padding: EdgeInsets.zero,
-                              minimumSize: const Size(48, 40),
-                              foregroundColor: terracotta,
-                            ),
-                            onPressed: () => _askName(context),
-                            icon: const Icon(Icons.edit_outlined, size: 18),
-                            label: const Text('Add your name'),
-                          )
-                        else
-                          Text("What's on the menu today?",
-                              style: text.bodyMedium?.copyWith(color: mutedBrown, fontSize: 16)),
-                      ],
-                    ),
-                  ),
-                  IconButton.filledTonal(
-                    tooltip: 'Log out',
-                    style: IconButton.styleFrom(
-                      backgroundColor: creamDeep,
-                      foregroundColor: inkBrown,
-                      minimumSize: const Size(48, 48),
-                    ),
-                    icon: const Icon(Icons.logout_rounded),
-                    onPressed: () => FirebaseAuth.instance.signOut(),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 24),
-              _CookPanel(
-                onTap: () => Navigator.of(context).push(
-                  MaterialPageRoute(builder: (_) => DishSuggestionScreen(data: _data)),
-                ),
-              ),
-              const SizedBox(height: 28),
-              Text('Your groceries', style: text.titleLarge),
-              const SizedBox(height: 12),
-              _Groceries(inventory: _inventory, dates: _dates, onAdd: _openAddGroceries),
-              const SizedBox(height: 28),
-              Text('More', style: text.titleLarge),
-              const SizedBox(height: 12),
-              Container(
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(20),
-                  border: Border.all(color: lineTan),
-                ),
-                child: Column(
+    return SafeArea(
+      child: TweenAnimationBuilder<double>(
+        tween: Tween(begin: 0, end: 1),
+        duration: context.motion(450),
+        curve: Curves.easeOutCubic,
+        builder: (context, t, child) => Opacity(
+          opacity: t,
+          child: Transform.translate(offset: Offset(0, 16 * (1 - t)), child: child),
+        ),
+        child: Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: maxContentWidth),
+            child: ListView(
+              padding: const EdgeInsets.fromLTRB(Space.l, Space.m, Space.l, Space.xl),
+              children: [
+                Row(
                   children: [
-                    _MoreRow(
-                      icon: Icons.menu_book_rounded,
-                      title: 'Daily log',
-                      subtitle: 'What you cooked and used',
-                      onTap: _openDailyLog,
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            '${_weekdays[now.weekday - 1]}, ${now.day} ${_months[now.month - 1]}',
+                            style: text.bodySmall?.copyWith(color: colors.onSurfaceVariant),
+                          ),
+                          Text(
+                            name.isEmpty ? _greeting() : '${_greeting()}, $name',
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: text.headlineMedium,
+                          ),
+                          if (name.isEmpty)
+                            TextButton.icon(
+                              style: TextButton.styleFrom(
+                                padding: EdgeInsets.zero,
+                                alignment: AlignmentDirectional.centerStart,
+                              ),
+                              onPressed: () => _askName(context),
+                              icon: const Icon(Icons.edit_outlined, size: 18),
+                              label: const Text('Add your name'),
+                            )
+                          else
+                            Text("What's on the menu today?",
+                                style: text.bodyMedium?.copyWith(color: colors.onSurfaceVariant)),
+                        ],
+                      ),
                     ),
-                    const Divider(height: 1, indent: 72, color: lineTan),
-                    _MoreRow(
-                      icon: Icons.family_restroom_rounded,
-                      title: 'Family profile',
-                      subtitle: 'Tastes, ages and habits',
-                      onTap: _openProfile,
+                    IconButton.filledTonal(
+                      tooltip: 'Log out',
+                      icon: const Icon(Icons.logout_rounded),
+                      onPressed: () => FirebaseAuth.instance.signOut(),
                     ),
                   ],
                 ),
-              ),
-            ],
+                const SizedBox(height: Space.l),
+                _Hero(onTap: () => _openTab(2, DishSuggestionScreen(data: _data))),
+                const SizedBox(height: Space.l),
+                _KitchenStock(
+                  inventory: _inventory,
+                  dates: _dates,
+                  onAdd: () => widget.onOpenTab?.call(1),
+                  canAdd: widget.onOpenTab != null,
+                  onAddFallback: () => Navigator.of(context)
+                      .push(MaterialPageRoute(builder: (_) => AddGroceriesScreen(data: _data))),
+                ),
+                const SizedBox(height: Space.l),
+                SectionHeader('Cooked this week', actionLabel: 'Daily log', onAction: _openDailyLog),
+                const SizedBox(height: Space.s),
+                _CookedThisWeek(meals: _meals, onLog: _openLogDish),
+              ],
+            ),
           ),
         ),
       ),
@@ -195,74 +189,80 @@ class _HomeScreenState extends State<HomeScreen> {
 }
 
 /// The main action: asking what to cook is the heart of the app.
-class _CookPanel extends StatelessWidget {
-  const _CookPanel({required this.onTap});
+class _Hero extends StatelessWidget {
+  const _Hero({required this.onTap});
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    final text = Theme.of(context).textTheme;
-    return Material(
-      color: terracotta,
-      borderRadius: BorderRadius.circular(24),
+    final text = context.text;
+    final colors = context.colors;
+    return Container(
+      decoration: BoxDecoration(color: colors.primary, borderRadius: Corner.largeRadius),
       clipBehavior: Clip.antiAlias,
-      child: InkWell(
-        onTap: onTap,
-        child: Stack(
-          children: [
-            Positioned(
-              right: -18,
-              bottom: -22,
-              child: Icon(Icons.ramen_dining_rounded,
-                  size: 140, color: Colors.white.withValues(alpha: 0.14)),
+      child: Stack(
+        children: [
+          PositionedDirectional(
+            end: -24,
+            top: -24,
+            child: ExcludeSemantics(
+              child: Icon(Icons.ramen_dining_rounded, size: 150, color: colors.onPrimary.withValues(alpha: 0.16)),
             ),
-            Padding(
-              padding: const EdgeInsets.all(22),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text('What can I cook?',
-                      style: text.headlineSmall?.copyWith(color: Colors.white)),
-                  const SizedBox(height: 8),
-                  Text(
-                    'Get dish ideas from what is at home, without repeating this week\'s meals.',
-                    style: text.bodyLarge?.copyWith(color: Colors.white, fontSize: 16),
+          ),
+          Padding(
+            padding: const EdgeInsets.all(Space.l),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 240),
+                  child: Text(
+                    'What should we cook today?',
+                    style: text.headlineMedium?.copyWith(color: colors.onPrimary),
                   ),
-                  const SizedBox(height: 20),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(14),
+                ),
+                const SizedBox(height: Space.s),
+                Text(
+                  "From what's at home, without repeating this week's meals.",
+                  style: text.bodyMedium?.copyWith(color: colors.onPrimary),
+                ),
+                const SizedBox(height: Space.l),
+                SizedBox(
+                  width: double.infinity,
+                  child: FilledButton.icon(
+                    style: FilledButton.styleFrom(
+                      backgroundColor: context.appColors.turmeric,
+                      foregroundColor: context.appColors.onTurmeric,
                     ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text('Get ideas',
-                            style: text.bodyLarge
-                                ?.copyWith(color: terracotta, fontWeight: FontWeight.w800)),
-                        const SizedBox(width: 8),
-                        const Icon(Icons.arrow_forward_rounded, color: terracotta, size: 20),
-                      ],
-                    ),
+                    onPressed: onTap,
+                    icon: const Icon(Icons.auto_awesome_rounded),
+                    label: const Text('Suggest a dish'),
                   ),
-                ],
-              ),
+                ),
+              ],
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
 }
 
-/// Add button, then either the empty message or the dashboard.
-class _Groceries extends StatelessWidget {
-  const _Groceries({required this.inventory, required this.dates, required this.onAdd});
+/// How long the groceries should last, the amounts, and the way to add more.
+class _KitchenStock extends StatelessWidget {
+  const _KitchenStock({
+    required this.inventory,
+    required this.dates,
+    required this.onAdd,
+    required this.canAdd,
+    required this.onAddFallback,
+  });
 
   final Stream<List<InventoryItem>> inventory;
   final Stream<ShoppingDates> dates;
   final VoidCallback onAdd;
+  final bool canAdd;
+  final VoidCallback onAddFallback;
 
   @override
   Widget build(BuildContext context) {
@@ -270,64 +270,99 @@ class _Groceries extends StatelessWidget {
       stream: inventory,
       builder: (context, snapshot) {
         if (snapshot.hasError) {
-          return const _Message('Could not load your groceries. Please check your internet.');
+          return ErrorStateCard(message: 'Could not load your groceries. Please check your internet.');
         }
         if (!snapshot.hasData) {
-          return const Padding(
-            padding: EdgeInsets.symmetric(vertical: 24),
-            child: Center(child: CircularProgressIndicator()),
-          );
+          return const AppCard(child: SizedBox(height: 120, child: Center(child: CircularProgressIndicator())));
         }
         final items = snapshot.data!;
-        if (items.isEmpty) return _GroceriesEmpty(onAdd: onAdd);
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            FilledButton.tonalIcon(
-              style: FilledButton.styleFrom(
-                backgroundColor: terracottaSoft,
-                foregroundColor: terracotta,
-              ),
-              onPressed: onAdd,
-              icon: const Icon(Icons.add_rounded),
-              label: const Text('Add groceries'),
-            ),
-            const SizedBox(height: 12),
-            StreamBuilder<ShoppingDates>(
-              stream: dates,
-              builder: (context, snap) => _Dashboard(items: items, next: snap.data?.next),
-            ),
-          ],
+        if (items.isEmpty) return _StockEmpty(onAdd: canAdd ? onAdd : onAddFallback);
+        return StreamBuilder<ShoppingDates>(
+          stream: dates,
+          builder: (context, snap) => _StockCard(
+            items: items,
+            last: snap.data?.last,
+            next: snap.data?.next,
+            onSeeAll: canAdd ? onAdd : null,
+          ),
         );
       },
     );
   }
 }
 
-/// Days until the next shopping, what is left, and the total, so mum can judge for herself.
-class _Dashboard extends StatelessWidget {
-  const _Dashboard({required this.items, required this.next});
+/// A plain message inside a card, for failures that do not need a retry button.
+class ErrorStateCard extends StatelessWidget {
+  const ErrorStateCard({super.key, required this.message});
+  final String message;
+
+  @override
+  Widget build(BuildContext context) => AppCard(
+        color: context.colors.errorContainer,
+        borderColor: context.colors.errorContainer,
+        child: Row(
+          children: [
+            Icon(Icons.cloud_off_rounded, color: context.colors.onErrorContainer),
+            const SizedBox(width: Space.m),
+            Expanded(
+              child: Text(message, style: context.text.bodyMedium?.copyWith(color: context.colors.onErrorContainer)),
+            ),
+          ],
+        ),
+      );
+}
+
+class _StockCard extends StatelessWidget {
+  const _StockCard({required this.items, required this.last, required this.next, required this.onSeeAll});
+
   final List<InventoryItem> items;
+  final DateTime? last;
   final DateTime? next;
+  final VoidCallback? onSeeAll;
+
+  /// How far through the shopping cycle she is, 0 to 1, or null when a date is missing.
+  double? get _progress {
+    if (last == null || next == null) return null;
+    final total = daysUntil(last!, next!);
+    if (total <= 0) return null;
+    return (daysUntil(last!, DateTime.now()) / total).clamp(0.0, 1.0);
+  }
 
   @override
   Widget build(BuildContext context) {
-    final text = Theme.of(context).textTheme;
-    return Container(
-      padding: const EdgeInsets.all(18),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: lineTan),
-      ),
+    final text = context.text;
+    final colors = context.colors;
+    final shown = items.take(5).toList();
+    final progress = _progress;
+    return AppCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(daysUntilMessage(DateTime.now(), next), style: text.titleMedium),
-          const SizedBox(height: 14),
-          for (final item in items)
+          Row(
+            children: [
+              Expanded(
+                child: Text('KITCHEN STOCK',
+                    style: text.labelSmall?.copyWith(color: colors.onSurfaceVariant, letterSpacing: 0.8)),
+              ),
+              if (onSeeAll != null) TextButton(onPressed: onSeeAll, child: const Text('See all')),
+            ],
+          ),
+          Text(daysUntilMessage(DateTime.now(), next), style: text.titleLarge),
+          if (progress != null) ...[
+            const SizedBox(height: Space.m),
+            Semantics(
+              label: 'Shopping cycle progress',
+              value: '${(progress * 100).round()} percent',
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(8),
+                child: LinearProgressIndicator(value: progress, color: colors.secondary),
+              ),
+            ),
+          ],
+          const SizedBox(height: Space.m),
+          for (final item in shown)
             Padding(
-              padding: const EdgeInsets.symmetric(vertical: 5),
+              padding: const EdgeInsets.symmetric(vertical: Space.xs),
               child: Row(
                 children: [
                   Expanded(child: Text(item.name, style: text.bodyLarge)),
@@ -336,85 +371,64 @@ class _Dashboard extends StatelessWidget {
                 ],
               ),
             ),
-          const Divider(height: 24, color: lineTan),
+          if (items.length > shown.length)
+            Padding(
+              padding: const EdgeInsets.only(top: Space.xs),
+              child: Text('+ ${items.length - shown.length} more',
+                  style: text.bodySmall?.copyWith(color: colors.onSurfaceVariant)),
+            ),
+          const Divider(height: Space.l),
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text('Total left', style: text.titleMedium),
-              const SizedBox(width: 12),
+              const SizedBox(width: Space.m),
               Expanded(
                 child: Text(
                   describeTotals(totalsByUnit(items)),
-                  textAlign: TextAlign.right,
-                  style: text.titleMedium?.copyWith(color: leafGreen),
+                  textAlign: TextAlign.end,
+                  style: text.titleMedium?.copyWith(color: colors.secondary),
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 6),
-          Text('Amounts are approximate.',
-              style: text.bodyMedium?.copyWith(color: mutedBrown, fontSize: 14)),
+          const SizedBox(height: Space.xs),
+          Text('Amounts are approximate.', style: text.bodySmall?.copyWith(color: colors.onSurfaceVariant)),
         ],
       ),
     );
   }
 }
 
-class _Message extends StatelessWidget {
-  const _Message(this.text);
-  final String text;
-
-  @override
-  Widget build(BuildContext context) => Padding(
-        padding: const EdgeInsets.symmetric(vertical: 12),
-        child: Text(text, style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: mutedBrown)),
-      );
-}
-
 /// Shown until the first groceries are added (prd.md > States and Boundaries).
-class _GroceriesEmpty extends StatelessWidget {
-  const _GroceriesEmpty({required this.onAdd});
+class _StockEmpty extends StatelessWidget {
+  const _StockEmpty({required this.onAdd});
   final VoidCallback onAdd;
 
   @override
   Widget build(BuildContext context) {
-    final text = Theme.of(context).textTheme;
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: lineTan),
-      ),
+    return AppCard(
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Row(
             children: [
-              Container(
-                width: 44,
-                height: 44,
-                decoration: const BoxDecoration(color: creamDeep, shape: BoxShape.circle),
-                child: const Icon(Icons.shopping_basket_rounded, color: mutedBrown),
-              ),
-              const SizedBox(width: 14),
-              Expanded(child: Text('No groceries yet', style: text.titleMedium)),
+              Icon(Icons.shopping_basket_rounded, color: context.colors.onSurfaceVariant),
+              const SizedBox(width: Space.m),
+              Expanded(child: Text('No groceries yet', style: context.text.titleLarge)),
             ],
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: Space.s),
           Text(
-            'Add this month\'s shopping and I will keep track of what is left and how many days until your next trip.',
-            style: text.bodyMedium?.copyWith(color: mutedBrown, fontSize: 16, height: 1.4),
+            "Add this month's shopping and I will keep track of what is left and how many days until your next trip.",
+            style: context.text.bodyMedium?.copyWith(color: context.colors.onSurfaceVariant),
           ),
-          const SizedBox(height: 18),
-          FilledButton.tonalIcon(
-            style: FilledButton.styleFrom(
-              backgroundColor: terracottaSoft,
-              foregroundColor: terracotta,
-            ),
+          const SizedBox(height: Space.m),
+          AppButton(
+            label: 'Add groceries',
+            icon: Icons.add_rounded,
+            kind: AppButtonKind.secondary,
             onPressed: onAdd,
-            icon: const Icon(Icons.add_rounded),
-            label: const Text('Add groceries'),
           ),
         ],
       ),
@@ -422,52 +436,69 @@ class _GroceriesEmpty extends StatelessWidget {
   }
 }
 
-class _MoreRow extends StatelessWidget {
-  const _MoreRow({
-    required this.icon,
-    required this.title,
-    required this.subtitle,
-    required this.onTap,
-  });
-  final IconData icon;
-  final String title;
-  final String subtitle;
-  final VoidCallback onTap;
+/// A row of small cards, one per dish cooked in the last 7 days.
+class _CookedThisWeek extends StatelessWidget {
+  const _CookedThisWeek({required this.meals, required this.onLog});
+
+  final Stream<List<MealEntry>> meals;
+  final VoidCallback onLog;
 
   @override
   Widget build(BuildContext context) {
-    final text = Theme.of(context).textTheme;
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(20),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-        child: Row(
-          children: [
-            Container(
-              width: 44,
-              height: 44,
-              decoration: BoxDecoration(
-                color: creamDeep,
-                borderRadius: BorderRadius.circular(14),
-              ),
-              child: Icon(icon, color: inkBrown),
+    return StreamBuilder<List<MealEntry>>(
+      stream: meals,
+      builder: (context, snapshot) {
+        final text = context.text;
+        final colors = context.colors;
+        if (snapshot.hasError) return const SizedBox.shrink();
+        if (!snapshot.hasData) return const SizedBox(height: 96);
+        final cutoff = DateTime.now().subtract(const Duration(days: 7));
+        final recent = snapshot.data!.where((m) => m.date.isAfter(cutoff)).toList();
+        if (recent.isEmpty) {
+          return AppCard(
+            onTap: onLog,
+            child: Row(
+              children: [
+                Icon(Icons.menu_book_rounded, color: colors.onSurfaceVariant),
+                const SizedBox(width: Space.m),
+                Expanded(
+                  child: Text('Nothing cooked yet this week. Tap to log a dish.',
+                      style: text.bodyMedium?.copyWith(color: colors.onSurfaceVariant)),
+                ),
+              ],
             ),
-            const SizedBox(width: 14),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(title, style: text.titleMedium),
-                  Text(subtitle,
-                      style: text.bodyMedium?.copyWith(color: mutedBrown, fontSize: 14)),
-                ],
-              ),
-            ),
-            const Icon(Icons.chevron_right_rounded, color: mutedBrown),
-          ],
-        ),
-      ),
+          );
+        }
+        return SizedBox(
+          height: 112,
+          child: ListView.separated(
+            scrollDirection: Axis.horizontal,
+            itemCount: recent.length,
+            separatorBuilder: (_, _) => const SizedBox(width: Space.s),
+            itemBuilder: (context, i) {
+              final m = recent[i];
+              return SizedBox(
+                width: 128,
+                child: AppCard(
+                  padding: const EdgeInsets.all(Space.m),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(_short[m.date.weekday - 1].toUpperCase(),
+                          style: text.labelSmall?.copyWith(color: colors.onSurfaceVariant)),
+                      const SizedBox(height: Space.xs),
+                      Expanded(
+                        child: Text(m.dishName,
+                            maxLines: 3, overflow: TextOverflow.ellipsis, style: text.titleMedium),
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            },
+          ),
+        );
+      },
     );
   }
 }

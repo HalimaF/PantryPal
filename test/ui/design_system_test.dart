@@ -39,6 +39,7 @@ void main() {
         'primary/surface (links)': (s.primary, s.surface),
         'onSuccess/successContainer': (a.onSuccessContainer, a.successContainer),
         'onWarning/warningContainer': (a.onWarningContainer, a.warningContainer),
+        'onTurmeric/turmeric': (a.onTurmeric, a.turmeric),
         'onSurface/surfaceContainerLow (cards)': (s.onSurface, s.surfaceContainerLow),
       };
       pairs.forEach((name, p) {
@@ -60,7 +61,7 @@ void main() {
         ])
           if (s?.fontSize != null) s!.fontSize!,
       };
-      expect(sizes, {28.0, 20.0, 16.0, 14.0});
+      expect(sizes, {26.0, 19.0, 16.0, 13.0});
     });
   });
 

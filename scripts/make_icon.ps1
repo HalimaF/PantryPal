@@ -9,7 +9,7 @@ function Draw($path, $withBackground, $scale) {
   $bmp = New-Object Drawing.Bitmap $size, $size
   $g = [Drawing.Graphics]::FromImage($bmp)
   $g.SmoothingMode = 'AntiAlias'
-  if ($withBackground) { $g.Clear((C '#B84A17')) } else { $g.Clear([Drawing.Color]::Transparent) }
+  if ($withBackground) { $g.Clear((C '#C2381E')) } else { $g.Clear([Drawing.Color]::Transparent) }
   # content is drawn around the centre and scaled so it stays inside Android's safe zone
   $g.TranslateTransform($size / 2, $size / 2)
   $g.ScaleTransform($scale, $scale)

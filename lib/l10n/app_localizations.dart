@@ -237,6 +237,30 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Missing'**
   String get missingIt;
+
+  /// No description provided for @tabHome.
+  ///
+  /// In en, this message translates to:
+  /// **'Home'**
+  String get tabHome;
+
+  /// No description provided for @tabGroceries.
+  ///
+  /// In en, this message translates to:
+  /// **'Groceries'**
+  String get tabGroceries;
+
+  /// No description provided for @tabCook.
+  ///
+  /// In en, this message translates to:
+  /// **'Cook'**
+  String get tabCook;
+
+  /// No description provided for @tabFamily.
+  ///
+  /// In en, this message translates to:
+  /// **'Family'**
+  String get tabFamily;
 }
 
 class _AppLocalizationsDelegate
