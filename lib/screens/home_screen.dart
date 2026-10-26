@@ -14,6 +14,7 @@ import 'add_groceries_screen.dart';
 import 'daily_log_screen.dart';
 import 'dish_suggestion_screen.dart';
 import 'log_dish_screen.dart';
+import 'settings_screen.dart';
 
 /// Home tab: one big way to ask what to cook, how long the groceries will last, and what was
 /// cooked this week. Implements prd.md > Screens and Layout (Home dashboard).
@@ -158,9 +159,14 @@ class _HomeScreenState extends State<HomeScreen> {
                       ),
                     ),
                     IconButton.filledTonal(
-                      tooltip: 'Log out',
-                      icon: const Icon(Icons.logout_rounded),
-                      onPressed: () => FirebaseAuth.instance.signOut(),
+                      tooltip: 'Settings',
+                      style: IconButton.styleFrom(
+                        backgroundColor: colors.primaryContainer,
+                        foregroundColor: colors.onPrimaryContainer,
+                      ),
+                      icon: const Icon(Icons.settings_rounded),
+                      onPressed: () => Navigator.of(context)
+                          .push(MaterialPageRoute(builder: (_) => SettingsScreen(user: user))),
                     ),
                   ],
                 ),

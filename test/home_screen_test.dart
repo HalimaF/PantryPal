@@ -196,10 +196,10 @@ void main() {
       expect(find.textContaining('Nothing logged yet'), findsOneWidget);
     });
 
-    testWidgets('has a way to log out', (tester) async {
+    testWidgets('has a way to open settings', (tester) async {
       await _open(tester);
 
-      expect(find.byTooltip('Log out'), findsOneWidget);
+      expect(find.byTooltip('Settings'), findsOneWidget);
     });
   });
 }
