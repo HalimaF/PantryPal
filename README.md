@@ -7,6 +7,10 @@ Built for the Devpost *Build With AI: Basics* hackathon. The idea came from a pr
 Asian households: mothers decide this every day, on a tight monthly budget, often while away from
 home and unsure what is left.
 
+**Demo video:** see the Devpost page. **Planning documents** (written with the Devpost Learn Skill Pack
+before any code): [scope](devpost/scope.md) · [PRD](devpost/prd.md) · [spec](devpost/spec.md) ·
+[build checklist](devpost/checklist.md).
+
 ## What it does
 
 - **Groceries.** Add the month's shopping by typing it or by taking a photo. A photo can hold several
@@ -81,17 +85,12 @@ You need Flutter, an Android phone or emulator, and a Firebase project.
    flutter build apk --release
    ```
    The file is `build/app/outputs/flutter-apk/app-release.apk`. Send it to an Android phone and open it.
-4. **A sample account to look around** (optional). This creates an account on *your* Firebase project
-   and fills it with a family, groceries and a week of meals:
-   ```
-   powershell -File scripts/seed_test_account.ps1 -Email you@example.com -Password choose-one
-   ```
-5. **Check everything:**
+4. **Check everything:**
    ```
    flutter analyze
    flutter test
    ```
-6. **Run every test and save the reports** (the phone must be connected and unlocked):
+5. **Run every test and save the reports** (the phone must be connected and unlocked):
    ```
    powershell -File scripts/run_all_tests.ps1
    ```
